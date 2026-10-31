@@ -37,8 +37,11 @@ const CONFIG = {
   },
 
   PLAYER: {
-    SIZE: 64,           // видимый диаметр
-    HITBOX_RADIUS: 27,  // хитбокс меньше видимого круга (~18%) — «прощающая» коллизия
+    // Героиня — пиксельная девушка-врач (assets/sprites/doctor.png, 64×64, рисуется без масштабирования)
+    TEXTURE: 'player',
+    SPRITE: 'assets/sprites/doctor.png',
+    SIZE: 64,           // размер спрайта
+    HITBOX_RADIUS: 27,  // круглый хитбокс по центру спрайта (не менялся)
     SPEED: 330,         // максимальная скорость, пикс/сек
     ACCELERATION: 18,   // чем больше, тем меньше инерция (18 — почти мгновенно)
     START: { x: 540, y: 1618 } // низ поля по центру (те же 91% высоты, что раньше)
@@ -47,12 +50,9 @@ const CONFIG = {
   CHASER: {
     HITBOX_RADIUS: 25,      // у всех ролей одинаковый круглый хитбокс (столкновения не менялись)
 
-    // Текстура врагов — пиксель-арт «пациент со шприцем» (assets/enemies/patient_syringe.png).
-    // Исходник 128×128 один раз уменьшается до SPRITE_SIZE без сглаживания (nearest-neighbor).
-    SPRITE_SOURCE: 'assets/enemies/patient_syringe.png',
-    SPRITE_SIZE: 96,
-    // Неоновое кольцо цвета роли у ног — по нему различаются три врага
-    RING: { OFFSET_Y: 38, WIDTH: 70, HEIGHT: 22 },
+    // У каждой роли свой пиксельный спрайт 64×64 (assets/sprites/), контур — цвета роли.
+    // Тень-кольцо цвета роли у ног: смещение от центра спрайта вниз и размеры эллипса
+    RING: { OFFSET_Y: 28, WIDTH: 46, HEIGHT: 14 },
     SEPARATION_RADIUS: 110, // ближе этого расстояния враги отталкиваются
     SEPARATION_FORCE: 1.5,
     SLIDE_TIME: 0.35,       // сколько секунд враг скользит вдоль препятствия
@@ -76,9 +76,10 @@ const CONFIG = {
       {
         key: 'hunter',
         name: 'Охотник',
-        texture: 'enemy-patient',
-        color: 0xff3b5c,      // красный (цвет кольца и шлейфа)
-        size: 96,             // = SPRITE_SIZE
+        texture: 'enemy-hunter',
+        sprite: 'assets/sprites/enemy_hunter.png', // пациент со шприцем
+        color: 0xff3b5c,      // красный (контур, кольцо и шлейф)
+        size: 64,             // размер спрайта
         start: { x: 540, y: 171 },
         speedFactor: 0.94,
         turnBase: 3.5,
@@ -88,9 +89,10 @@ const CONFIG = {
       {
         key: 'interceptor',
         name: 'Перехватчик',
-        texture: 'enemy-patient',
+        texture: 'enemy-interceptor',
+        sprite: 'assets/sprites/enemy_interceptor.png', // пациент с капельницей
         color: 0xd94bff,      // пурпурный
-        size: 96,
+        size: 64,
         start: { x: 930, y: 140 },
         speedFactor: 0.90,
         turnBase: 2.6,
@@ -103,9 +105,10 @@ const CONFIG = {
       {
         key: 'heavy',
         name: 'Тяжёлый загонщик',
-        texture: 'enemy-patient',
+        texture: 'enemy-heavy',
+        sprite: 'assets/sprites/enemy_heavy.png', // пациент в бинтах и гипсе
         color: 0xff8c1a,      // оранжевый
-        size: 96,
+        size: 64,
         start: { x: 150, y: 140 },
         speedFactor: 0.82,
         turnBase: 1.3,
@@ -120,8 +123,11 @@ const CONFIG = {
   },
 
   BONUS: {
-    SIZE: 42,
-    HITBOX_RADIUS: 21,
+    // Бонус — пиксельная таблетка-капсула (assets/sprites/bonus_pill.png, 48×48)
+    TEXTURE: 'bonus',
+    SPRITE: 'assets/sprites/bonus_pill.png',
+    SIZE: 48,
+    HITBOX_RADIUS: 21,      // не менялся
     POINTS: 100,
     FIRST_DELAY: 1000,      // мс до первого бонуса
     RESPAWN_DELAY: 1200,    // мс до следующего бонуса

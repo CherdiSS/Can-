@@ -36,6 +36,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.moveVelocity.y += (targetY - this.moveVelocity.y) * k;
 
     this.body.setVelocity(this.moveVelocity.x, this.moveVelocity.y);
+
+    // Спрайт нарисован лицом к зрителю: при движении влево зеркалим, вправо — возвращаем.
+    // Порог, чтобы героиня не «дёргалась» при почти вертикальном движении.
+    if (this.moveVelocity.x < -15) {
+      this.setFlipX(true);
+    } else if (this.moveVelocity.x > 15) {
+      this.setFlipX(false);
+    }
   }
 
   // Полная остановка (при поимке)

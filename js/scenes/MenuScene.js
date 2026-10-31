@@ -36,23 +36,26 @@ class MenuScene extends Phaser.Scene {
     title.setStroke(colorToCss(0x0b3a52), 8);
   }
 
-  // Маленькая «картинка» из игровых фигур: игрок, три врага и бонус
+  // «Картинка» из персонажей игры: героиня-врач, три пациента и таблетка.
+  // Масштаб ровно ×2 — пиксели остаются квадратными и чёткими.
   createIllustration(centerX) {
-    this.add.image(centerX, 590, 'player');
-    // Три врага (пациенты) с кольцами цвета роли: Загонщик, Охотник, Перехватчик
+    const scale = 2;
     const ring = CONFIG.CHASER.RING;
     const graphics = this.add.graphics();
-    [[centerX - 160, 525, 2], [centerX, 465, 0], [centerX + 160, 525, 1]].forEach(([x, y, roleIndex]) => {
-      graphics.lineStyle(4, CONFIG.CHASER.ROLES[roleIndex].color, 0.9);
-      graphics.strokeEllipse(x, y + ring.OFFSET_Y, ring.WIDTH, ring.HEIGHT);
-      this.add.image(x, y, 'enemy-patient').setFlipX(x < centerX);
+    // Загонщик, Охотник, Перехватчик — у каждого своя тень-кольцо цвета роли
+    [[centerX - 165, 525, 2], [centerX, 465, 0], [centerX + 165, 525, 1]].forEach(([x, y, roleIndex]) => {
+      const role = CONFIG.CHASER.ROLES[roleIndex];
+      graphics.lineStyle(4, role.color, 0.9);
+      graphics.strokeEllipse(x, y + ring.OFFSET_Y * scale, ring.WIDTH * scale, ring.HEIGHT * scale);
+      this.add.image(x, y, role.texture).setScale(scale).setFlipX(x < centerX);
     });
-    this.add.image(centerX + 210, 620, 'bonus');
+    this.add.image(centerX, 600, CONFIG.PLAYER.TEXTURE).setScale(scale);
+    this.add.image(centerX + 225, 650, CONFIG.BONUS.TEXTURE).setScale(scale);
   }
 
   createHints(centerX) {
-    createText(this, centerX, 730, 'Тяни пальцем для движения', 42);
-    createText(this, centerX, 790, 'Убегай от красных, собирай жёлтые', 30, CONFIG.COLORS.TEXT_DIM);
+    createText(this, centerX, 730, 'Управляй джойстиком внизу экрана', 34);
+    createText(this, centerX, 790, 'Убегай от пациентов, собирай таблетки', 30, CONFIG.COLORS.TEXT_DIM);
     createText(this, centerX, 835, 'На компьютере: WASD или стрелки', 26, CONFIG.COLORS.TEXT_DIM);
   }
 
