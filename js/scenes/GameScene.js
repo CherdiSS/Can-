@@ -21,13 +21,15 @@ class GameScene extends Phaser.Scene {
 
   create() {
     this.physics.resume();
-    this.physics.world.setBounds(0, CONFIG.ARENA_TOP, CONFIG.WIDTH, CONFIG.ARENA_HEIGHT);
+    // Поле (мир) больше экрана: координаты мира от (0, 0) до (ARENA.WIDTH, ARENA.HEIGHT)
+    this.physics.world.setBounds(0, 0, CONFIG.ARENA.WIDTH, CONFIG.ARENA.HEIGHT);
 
     this.createArena();
     this.createObstacles();
     this.createPlayer();
     this.createChasers();
     this.createBonus();
+    this.setupCamera();
     this.setupCollisions();
     this.setupKeyboard();
     this.createStartHint();
@@ -88,23 +90,32 @@ class GameScene extends Phaser.Scene {
 
   createArena() {
     const graphics = this.add.graphics();
-    const top = CONFIG.ARENA_TOP;
+    const width = CONFIG.ARENA.WIDTH;
+    const height = CONFIG.ARENA.HEIGHT;
 
     graphics.fillStyle(CONFIG.COLORS.ARENA, 1);
-    graphics.fillRect(0, top, CONFIG.WIDTH, CONFIG.ARENA_HEIGHT);
+    graphics.fillRect(0, 0, width, height);
 
-    // Слабая сетка — чтобы было видно движение
+    // Слабая сетка — чтобы было видно движение (и прокрутку камеры)
     graphics.lineStyle(1, CONFIG.COLORS.GRID, 0.06);
-    for (let x = 0; x <= CONFIG.WIDTH; x += 80) {
-      graphics.lineBetween(x, top, x, CONFIG.HEIGHT);
+    for (let x = 0; x <= width; x += 80) {
+      graphics.lineBetween(x, 0, x, height);
     }
-    for (let y = top; y <= CONFIG.HEIGHT; y += 80) {
-      graphics.lineBetween(0, y, CONFIG.WIDTH, y);
+    for (let y = 0; y <= height; y += 80) {
+      graphics.lineBetween(0, y, width, y);
     }
 
     // Рамка арены
     graphics.lineStyle(3, CONFIG.COLORS.GRID, 0.4);
-    graphics.strokeRect(1.5, top + 1.5, CONFIG.WIDTH - 3, CONFIG.ARENA_HEIGHT - 3);
+    graphics.strokeRect(1.5, 1.5, width - 3, height - 3);
+  }
+
+  // Камера показывает часть поля под HUD и следует за игроком, не выходя за края поля
+  setupCamera() {
+    const camera = this.cameras.main;
+    camera.setViewport(0, CONFIG.VIEW_TOP, CONFIG.WIDTH, CONFIG.VIEW_HEIGHT);
+    camera.setBounds(0, 0, CONFIG.ARENA.WIDTH, CONFIG.ARENA.HEIGHT);
+    camera.startFollow(this.player, true, 0.15, 0.15);
   }
 
   createObstacles() {
@@ -119,6 +130,25 @@ class GameScene extends Phaser.Scene {
 
     // Прямоугольники препятствий — для проверки, свободен ли путь рывка врага
     this.obstacleRects = this.obstacles.getChildren().map((obstacle) => obstacle.getBounds());
+
+    this.validateObstacleLayout();
+  }
+
+  // Подсказка для тех, кто будет менять раскладку: зазор между препятствиями
+  // не должен быть меньше OBSTACLE_MIN_GAP, иначе появятся узкие места и тупики
+  validateObstacleLayout() {
+    const rects = this.obstacleRects;
+    for (let i = 0; i < rects.length; i++) {
+      for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i];
+        const b = rects[j];
+        const dx = Math.max(0, b.left - a.right, a.left - b.right);
+        const dy = Math.max(0, b.top - a.bottom, a.top - b.bottom);
+        if (Math.hypot(dx, dy) < CONFIG.OBSTACLE_MIN_GAP) {
+          console.warn('Препятствия ' + i + ' и ' + j + ' ближе OBSTACLE_MIN_GAP');
+        }
+      }
+    }
   }
 
   createPlayer() {
@@ -172,11 +202,11 @@ class GameScene extends Phaser.Scene {
     this.startHint = createText(
       this,
       CONFIG.WIDTH / 2,
-      1000, // свободная полоса между боковыми стенками и нижним препятствием
+      870, // координаты окна камеры (не мира): над игроком в начале игры
       'Управляй джойстиком внизу экрана',
       32,
       CONFIG.COLORS.TEXT_DIM
-    ).setAlpha(0.8).setDepth(50);
+    ).setAlpha(0.8).setDepth(50).setScrollFactor(0); // не уезжает вместе с камерой
   }
 
   // Итоговое направление движения: джойстик важнее клавиатуры
@@ -265,9 +295,9 @@ class GameScene extends Phaser.Scene {
   findBonusPosition() {
     const B = CONFIG.BONUS;
     const minX = B.EDGE_MARGIN;
-    const maxX = CONFIG.WIDTH - B.EDGE_MARGIN;
-    const minY = CONFIG.ARENA_TOP + B.EDGE_MARGIN;
-    const maxY = CONFIG.HEIGHT - B.EDGE_MARGIN;
+    const maxX = CONFIG.ARENA.WIDTH - B.EDGE_MARGIN;
+    const minY = B.EDGE_MARGIN;
+    const maxY = CONFIG.ARENA.HEIGHT - B.EDGE_MARGIN;
 
     for (let attempt = 0; attempt < 80; attempt++) {
       const x = Phaser.Math.Between(minX, maxX);

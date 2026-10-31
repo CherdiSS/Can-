@@ -103,8 +103,8 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
         const x = player.x + (pv.x / playerSpeed) * role.leadDistance;
         const y = player.y + (pv.y / playerSpeed) * role.leadDistance;
         this.target.set(
-          Phaser.Math.Clamp(x, 0, CONFIG.WIDTH),
-          Phaser.Math.Clamp(y, CONFIG.ARENA_TOP, CONFIG.HEIGHT)
+          Phaser.Math.Clamp(x, 0, CONFIG.ARENA.WIDTH),
+          Phaser.Math.Clamp(y, 0, CONFIG.ARENA.HEIGHT)
         );
         return;
       }
@@ -119,7 +119,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
         );
       } else {
         // Бонуса нет — медленно занимает центр арены
-        this.target.set(CONFIG.WIDTH / 2, CONFIG.ARENA_TOP + CONFIG.ARENA_HEIGHT / 2);
+        this.target.set(CONFIG.ARENA.WIDTH / 2, CONFIG.ARENA.HEIGHT / 2);
       }
       return;
     }
@@ -306,7 +306,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     this.pathLine.setTo(this.x, this.y, endX, endY);
 
     // Конец рывка должен быть внутри арены, иначе враг сразу упрётся в край
-    if (endX < r || endX > CONFIG.WIDTH - r || endY < CONFIG.ARENA_TOP + r || endY > CONFIG.HEIGHT - r) {
+    if (endX < r || endX > CONFIG.ARENA.WIDTH - r || endY < r || endY > CONFIG.ARENA.HEIGHT - r) {
       return false;
     }
 
