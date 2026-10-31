@@ -88,26 +88,30 @@ class GameScene extends Phaser.Scene {
   // Создание мира
   // ---------------------------------------------------------------
 
+  // Пол и стены поликлиники — готовые пиксельные текстуры, рисуются один раз
   createArena() {
-    const graphics = this.add.graphics();
     const width = CONFIG.ARENA.WIDTH;
     const height = CONFIG.ARENA.HEIGHT;
+    const env = CONFIG.ENVIRONMENT;
 
-    graphics.fillStyle(CONFIG.COLORS.ARENA, 1);
-    graphics.fillRect(0, 0, width, height);
+    // Линолеум «под паркет»: один TileSprite на всё поле
+    this.add.tileSprite(0, 0, width, height, 'env-floor_tile').setOrigin(0).setDepth(0);
+    // Швы полотен, потёртости и коврик у входа
+    env.SEAMS_X.forEach((x) => {
+      this.add.tileSprite(x, 0, 2, height, 'env-decal_seam').setOrigin(0).setDepth(0);
+    });
+    env.WEAR.forEach(([x, y]) => this.add.image(x, y, 'env-decal_wear').setOrigin(0).setDepth(0));
+    this.add.image(env.MAT.x, env.MAT.y, 'env-decal_mat').setOrigin(0).setDepth(0);
 
-    // Слабая сетка — чтобы было видно движение (и прокрутку камеры)
-    graphics.lineStyle(1, CONFIG.COLORS.GRID, 0.06);
-    for (let x = 0; x <= width; x += 80) {
-      graphics.lineBetween(x, 0, x, height);
-    }
-    for (let y = 0; y <= height; y += 80) {
-      graphics.lineBetween(0, y, width, y);
-    }
-
-    // Рамка арены
-    graphics.lineStyle(3, CONFIG.COLORS.GRID, 0.4);
-    graphics.strokeRect(1.5, 1.5, width - 3, height - 3);
+    // Стены: фасад северной (двери кабинетов), тонкая кромка боковых и южной.
+    // Это только картинка: граница мира не менялась.
+    this.add.image(0, 0, 'env-wall_north').setOrigin(0).setDepth(2);
+    this.add.tileSprite(0, env.WALL_NORTH_HEIGHT, env.WALL_SIDE_WIDTH, height - env.WALL_NORTH_HEIGHT, 'env-wall_side')
+      .setOrigin(0).setDepth(2);
+    this.add.tileSprite(width, env.WALL_NORTH_HEIGHT, env.WALL_SIDE_WIDTH, height - env.WALL_NORTH_HEIGHT, 'env-wall_side')
+      .setOrigin(0).setFlipX(true).setDepth(2).setOrigin(1, 0);
+    this.add.tileSprite(0, height - env.WALL_BOTTOM_HEIGHT, width, env.WALL_BOTTOM_HEIGHT, 'env-wall_bottom')
+      .setOrigin(0).setDepth(2);
   }
 
   // Камера показывает часть поля под HUD и следует за игроком, не выходя за края поля
@@ -122,10 +126,21 @@ class GameScene extends Phaser.Scene {
     // Статичная группа: тела не двигаются и непроходимы
     this.obstacles = this.physics.add.staticGroup();
 
+    // Тени всех предметов — одна статичная графика под ними
+    const shadow = CONFIG.ENVIRONMENT.SHADOW;
+    const shadows = this.add.graphics().setDepth(1);
+    shadows.fillStyle(0x000000, shadow.ALPHA);
+
     CONFIG.OBSTACLES.forEach((item) => {
-      const rect = this.add.rectangle(item.x, item.y, item.w, item.h, CONFIG.COLORS.OBSTACLE_FILL);
-      rect.setStrokeStyle(3, CONFIG.COLORS.OBSTACLE_STROKE);
+      // Коллизия — прежний невидимый прямоугольник того же размера
+      const rect = this.add.rectangle(item.x, item.y, item.w, item.h).setVisible(false);
       this.obstacles.add(rect);
+
+      // Картинка предмета ровно поверх прямоугольника (верх + фронтальная грань внутри него)
+      const left = item.x - item.w / 2;
+      const top = item.y - item.h / 2;
+      shadows.fillRect(left + shadow.OFFSET, top + shadow.OFFSET, item.w, item.h);
+      this.add.image(left, top, 'obstacle-' + item.look).setOrigin(0).setDepth(3);
     });
 
     // Прямоугольники препятствий — для проверки, свободен ли путь рывка врага
