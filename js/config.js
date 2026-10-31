@@ -18,7 +18,7 @@ const CONFIG = {
     GRID: 0x3cf0ff,
     HUD: 0x080a18,
     PLAYER: 0x3cf0ff,   // неоново-голубой
-    CHASER: 0xff3b5c,   // неоново-красный
+    CHASER: 0xff3b5c,   // неоново-красный (заголовок «ПОЙМАН!»)
     BONUS: 0xffe14d,    // жёлтый
     OBSTACLE_FILL: 0x2a2f45,
     OBSTACLE_STROKE: 0x8a93b8,
@@ -35,17 +35,74 @@ const CONFIG = {
   },
 
   CHASER: {
-    SIZE: 58,
-    HITBOX_RADIUS: 25,                  // видимый размер больше хитбокса ~16%
-    SPEED_FACTORS: [0.8, 0.9, 0.95],    // доля от скорости игрока у каждого врага
-    STARTS: [
-      { x: 100, y: 230 },
-      { x: 360, y: 250 },
-      { x: 620, y: 230 }
-    ],
+    HITBOX_RADIUS: 25,      // у всех ролей одинаковый круглый хитбокс (столкновения не менялись)
     SEPARATION_RADIUS: 110, // ближе этого расстояния враги отталкиваются
     SEPARATION_FORCE: 1.5,
-    SLIDE_TIME: 0.35        // сколько секунд враг скользит вдоль препятствия
+    SLIDE_TIME: 0.35,       // сколько секунд враг скользит вдоль препятствия
+
+    // Рывок (Dash) — общие ограничения
+    DASH_MIN_RANGE: 110,    // ближе — не рвётся (и так рядом)
+    DASH_MAX_RANGE: 420,    // дальше — не рвётся (рывок бы не долетел)
+    DASH_ACCELERATION: 30,  // разгон до скорости рывка (не мгновенно)
+
+    // Шлейф
+    TRAIL_POINTS: 6,
+    TRAIL_INTERVAL: 0.035,  // сек между точками шлейфа
+
+    // Три роли врагов. speedFactor — доля от скорости игрока.
+    // turnBase/turnMax — поворотливость в начале и с конца 2-й фазы.
+    // dash: telegraph — предупреждение, duration — рывок,
+    //       speedFactor — скорость рывка (доля от скорости игрока),
+    //       recovery — пауза, когда новый рывок невозможен,
+    //       firstDelay — сдвиг первого рывка после 50 с (чтобы враги не рвались одновременно)
+    ROLES: [
+      {
+        key: 'hunter',
+        name: 'Охотник',
+        texture: 'enemy-hunter',
+        color: 0xff3b5c,      // красный
+        size: 60,
+        rotates: true,        // стрела поворачивается по направлению движения
+        start: { x: 360, y: 250 },
+        speedFactor: 0.94,
+        turnBase: 3.5,
+        turnMax: 5.0,
+        dash: { telegraph: 0.4, duration: 0.3, speedFactor: 1.9, recovery: 1.8, firstDelay: 0.5 }
+      },
+      {
+        key: 'interceptor',
+        name: 'Перехватчик',
+        texture: 'enemy-interceptor',
+        color: 0xd94bff,      // пурпурный
+        size: 58,
+        rotates: false,
+        start: { x: 620, y: 230 },
+        speedFactor: 0.90,
+        turnBase: 2.6,
+        turnMax: 3.8,
+        leadDistance: 140,    // целится на 140 px впереди игрока
+        leadMinPlayerSpeed: 0.25, // если игрок медленнее 25% скорости — гонится напрямую
+        leadMinDistance: 130, // вплотную к игроку — тоже напрямую
+        dash: { telegraph: 0.4, duration: 0.3, speedFactor: 1.8, recovery: 2.0, firstDelay: 1.8 }
+      },
+      {
+        key: 'heavy',
+        name: 'Тяжёлый загонщик',
+        texture: 'enemy-heavy',
+        color: 0xff8c1a,      // оранжевый
+        size: 66,
+        rotates: false,
+        start: { x: 100, y: 230 },
+        speedFactor: 0.82,
+        turnBase: 1.3,
+        turnMax: 1.9,
+        closeDistance: 220,   // игрок ближе — атакует напрямую
+        farDistance: 480,     // игрок дальше — медленно приближается к нему
+        cutFraction: 0.5,     // встаёт на середину пути «игрок → бонус»
+        arriveRadius: 90,     // плавно тормозит у точки-цели
+        dash: { telegraph: 0.5, duration: 0.4, speedFactor: 1.6, recovery: 2.4, firstDelay: 3.1 }
+      }
+    ]
   },
 
   BONUS: {
@@ -72,13 +129,14 @@ const CONFIG = {
   },
 
   DIFFICULTY: {
-    PHASE2_START: 20,          // сек
-    PHASE3_START: 50,          // сек
-    PHASE2_END_MULTIPLIER: 1.05, // множитель скорости врагов к концу 2-й фазы
-    PHASE3_MAX_MULTIPLIER: 1.1,  // максимум в 3-й фазе (самый быстрый ≈ 1.045 от игрока)
-    PHASE3_RAMP_TIME: 30,        // за сколько секунд 3-й фазы достигается максимум
-    TURN_RATE_BASE: 2.2,         // манёвренность врагов в начале
-    TURN_RATE_MAX: 4.5           // манёвренность врагов с конца 2-й фазы
+    PHASE2_START: 20,             // сек
+    PHASE3_START: 50,             // сек: с этого момента враги начинают рывки
+    PHASE2_END_MULTIPLIER: 1.03,  // множитель скорости врагов к концу 2-й фазы (дальше не растёт)
+    MAX_ENEMY_SPEED_FACTOR: 0.97, // потолок ПОСТОЯННОЙ скорости любого врага (доля от игрока)
+    // Пауза между рывками сверх восстановления: сокращается с 4 с (50-я секунда) до 1 с (90-я)
+    DASH_INTERVAL_START: 4.0,
+    DASH_INTERVAL_END: 1.0,
+    DASH_INTERVAL_RAMP_TIME: 40
   },
 
   JOYSTICK: {

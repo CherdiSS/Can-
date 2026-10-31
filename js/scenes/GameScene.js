@@ -64,8 +64,22 @@ class GameScene extends Phaser.Scene {
 
     this.player.move(input.x, input.y, dt);
 
+    // Общие данные кадра для всех врагов
+    const ctx = {
+      dt: dt,
+      player: this.player,
+      chasers: this.chasers,
+      bonus: this.bonus,
+      obstacleRects: this.obstacleRects,
+      speedMultiplier: difficulty.speedMultiplier,
+      turnProgress: difficulty.turnProgress,
+      dashInterval: difficulty.dashInterval,
+      // Рывок одновременно делает только один враг — так честнее и предсказуемее
+      dashBusy: this.chasers.some((chaser) => chaser.isDashBusy())
+    };
     this.chasers.forEach((chaser) => {
-      chaser.chase(this.player, this.chasers, dt, difficulty.speedMultiplier, difficulty.turnRate);
+      chaser.updateChaser(ctx);
+      ctx.dashBusy = ctx.dashBusy || chaser.isDashBusy();
     });
 
     this.updateBonusLifetime(dt, difficulty.phase);
@@ -111,6 +125,9 @@ class GameScene extends Phaser.Scene {
       rect.setStrokeStyle(3, CONFIG.COLORS.OBSTACLE_STROKE);
       this.obstacles.add(rect);
     });
+
+    // Прямоугольники препятствий — для проверки, свободен ли путь рывка врага
+    this.obstacleRects = this.obstacles.getChildren().map((obstacle) => obstacle.getBounds());
   }
 
   createPlayer() {
@@ -119,9 +136,8 @@ class GameScene extends Phaser.Scene {
 
   createChasers() {
     // Обычный массив: Phaser-коллайдеры умеют работать с массивами
-    this.chasers = CONFIG.CHASER.STARTS.map((start, index) => {
-      return new Chaser(this, start.x, start.y, CONFIG.CHASER.SPEED_FACTORS[index]);
-    });
+    // Три врага с разными ролями: Охотник, Перехватчик, Тяжёлый загонщик
+    this.chasers = CONFIG.CHASER.ROLES.map((role) => new Chaser(this, role));
   }
 
   createBonus() {
@@ -336,31 +352,34 @@ class GameScene extends Phaser.Scene {
   // Сложность
   // ---------------------------------------------------------------
 
-  // Возвращает фазу, множитель скорости врагов и их манёвренность
+  // Возвращает фазу, множитель скорости врагов, прогресс их манёвренности (0..1)
+  // и паузу между рывками (null — рывков ещё нет)
   getDifficulty(t) {
     const D = CONFIG.DIFFICULTY;
 
-    // Фаза 1: базовая скорость
+    // Фаза 1: базовая скорость, рывков нет
     if (t < D.PHASE2_START) {
-      return { phase: 1, speedMultiplier: 1, turnRate: D.TURN_RATE_BASE };
+      return { phase: 1, speedMultiplier: 1, turnProgress: 0, dashInterval: null };
     }
 
-    // Фаза 2: скорость и манёвренность плавно растут
+    // Фаза 2: скорость (до потолка 0.97 от игрока) и манёвренность плавно растут
     if (t < D.PHASE3_START) {
       const progress = (t - D.PHASE2_START) / (D.PHASE3_START - D.PHASE2_START);
       return {
         phase: 2,
         speedMultiplier: Phaser.Math.Linear(1, D.PHASE2_END_MULTIPLIER, progress),
-        turnRate: Phaser.Math.Linear(D.TURN_RATE_BASE, D.TURN_RATE_MAX, progress)
+        turnProgress: progress,
+        dashInterval: null
       };
     }
 
-    // Фаза 3: самый быстрый враг догоняет скорость игрока и чуть превышает её
-    const progress = Math.min(1, (t - D.PHASE3_START) / D.PHASE3_RAMP_TIME);
+    // Фаза 3: скорость больше не растёт, вместо этого — рывки, всё чаще
+    const progress = Math.min(1, (t - D.PHASE3_START) / D.DASH_INTERVAL_RAMP_TIME);
     return {
       phase: 3,
-      speedMultiplier: Phaser.Math.Linear(D.PHASE2_END_MULTIPLIER, D.PHASE3_MAX_MULTIPLIER, progress),
-      turnRate: D.TURN_RATE_MAX
+      speedMultiplier: D.PHASE2_END_MULTIPLIER,
+      turnProgress: 1,
+      dashInterval: Phaser.Math.Linear(D.DASH_INTERVAL_START, D.DASH_INTERVAL_END, progress)
     };
   }
 
@@ -447,7 +466,7 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   onChaserHitObstacle(chaser, obstacle) {
-    chaser.startSliding(obstacle.getBounds(), this.player);
+    chaser.startSliding(obstacle.getBounds());
   }
 
   onPlayerCaught(player, chaser) {

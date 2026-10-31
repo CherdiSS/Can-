@@ -36,12 +36,13 @@ class MenuScene extends Phaser.Scene {
     title.setStroke(colorToCss(0x0b3a52), 8);
   }
 
-  // Маленькая «картинка» из игровых фигур: игрок и три преследователя
+  // Маленькая «картинка» из игровых фигур: игрок, три врага и бонус
   createIllustration(centerX) {
     this.add.image(centerX, 590, 'player');
-    this.add.image(centerX - 150, 500, 'chaser');
-    this.add.image(centerX + 150, 500, 'chaser');
-    this.add.image(centerX, 450, 'chaser');
+    // Три врага: Охотник, Перехватчик, Тяжёлый загонщик
+    this.add.image(centerX, 450, 'enemy-hunter').setRotation(Math.PI / 2);
+    this.add.image(centerX + 150, 500, 'enemy-interceptor');
+    this.add.image(centerX - 150, 500, 'enemy-heavy');
     this.add.image(centerX + 210, 620, 'bonus');
   }
 
