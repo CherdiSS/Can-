@@ -18,8 +18,10 @@ class GameScene extends Phaser.Scene {
     this.isGameOver = false;
     this.hasMoved = false;       // двигался ли игрок (для подсказки)
 
-    // Состояние джойстика: x, y — вектор направления длиной 0..1
-    this.joystick = { pointerId: null, baseX: 0, baseY: 0, x: 0, y: 0 };
+    // Состояние джойстика:
+    // baseX/baseY — центр базы, fingerX/fingerY — где сейчас палец,
+    // x, y — итоговый вектор направления длиной 0..1
+    this.joystick = { pointerId: null, baseX: 0, baseY: 0, fingerX: 0, fingerY: 0, x: 0, y: 0 };
   }
 
   create() {
@@ -57,6 +59,7 @@ class GameScene extends Phaser.Scene {
     this.elapsed += dt;
 
     const difficulty = this.getDifficulty(this.elapsed);
+    this.updateJoystick(dt); // база плавно следует за пальцем каждый кадр
     const input = this.getMoveInput();
 
     this.player.move(input.x, input.y, dt);
@@ -99,6 +102,11 @@ class GameScene extends Phaser.Scene {
     this.obstacles = this.physics.add.staticGroup();
 
     CONFIG.OBSTACLES.forEach((item) => {
+      // Нижняя безопасная зона должна оставаться свободной для пальца
+      if (item.y + item.h / 2 > CONFIG.BOTTOM_SAFE_ZONE_TOP) {
+        console.warn('Препятствие заходит в нижнюю безопасную зону и пропущено:', item);
+        return;
+      }
       const rect = this.add.rectangle(item.x, item.y, item.w, item.h, CONFIG.COLORS.OBSTACLE_FILL);
       rect.setStrokeStyle(3, CONFIG.COLORS.OBSTACLE_STROKE);
       this.obstacles.add(rect);
@@ -154,8 +162,8 @@ class GameScene extends Phaser.Scene {
   }
 
   setupJoystick() {
-    // Джойстик появляется только в нижней половине арены
-    this.joystickZoneTop = CONFIG.ARENA_TOP + CONFIG.ARENA_HEIGHT / 2;
+    // Джойстик запускается по всей арене ниже HUD
+    this.joystickZoneTop = CONFIG.ARENA_TOP;
     this.joystickGraphics = this.add.graphics().setDepth(100);
 
     this.input.on('pointerdown', this.onPointerDown, this);
@@ -168,11 +176,17 @@ class GameScene extends Phaser.Scene {
     this.startHint = createText(
       this,
       CONFIG.WIDTH / 2,
-      this.joystickZoneTop + 120,
-      'Коснись нижней части экрана\nи тяни пальцем',
+      CONFIG.BOTTOM_SAFE_ZONE_TOP - 140,
+      'Коснись арены в любом месте\nи тяни пальцем',
       36,
       CONFIG.COLORS.TEXT_DIM
     ).setAlpha(0.8).setDepth(50);
+  }
+
+  // Касание рядом с кнопкой паузы не должно двигать персонажа
+  isInPauseSafeZone(x, y) {
+    const zone = CONFIG.JOYSTICK.PAUSE_SAFE_ZONE;
+    return x >= zone.left && y <= zone.bottom;
   }
 
   onPointerDown(pointer) {
@@ -180,23 +194,30 @@ class GameScene extends Phaser.Scene {
     if (this.isGameOver || this.joystick.pointerId !== null) {
       return;
     }
-    if (pointer.y < this.joystickZoneTop) {
+    // HUD и область у паузы не запускают джойстик.
+    // Нажатия на кнопки UIScene сюда вообще не доходят: сцена интерфейса выше,
+    // и Phaser (input.topOnly) останавливает событие на нажатой кнопке.
+    if (pointer.y <= this.joystickZoneTop || this.isInPauseSafeZone(pointer.x, pointer.y)) {
       return;
     }
 
-    const radius = CONFIG.JOYSTICK.RADIUS;
+    // База появляется точно под пальцем — касание само по себе не даёт движения
     this.joystick.pointerId = pointer.id;
-    // Основание не должно вылезать за края экрана
-    this.joystick.baseX = Phaser.Math.Clamp(pointer.x, radius, CONFIG.WIDTH - radius);
-    this.joystick.baseY = Phaser.Math.Clamp(pointer.y, CONFIG.ARENA_TOP + radius, CONFIG.HEIGHT - radius);
-    this.updateJoystick(pointer);
+    this.joystick.baseX = pointer.x;
+    this.joystick.baseY = pointer.y;
+    this.joystick.fingerX = pointer.x;
+    this.joystick.fingerY = pointer.y;
+    this.updateJoystick(0);
   }
 
   onPointerMove(pointer) {
     if (pointer.id !== this.joystick.pointerId) {
       return;
     }
-    this.updateJoystick(pointer);
+    // Только запоминаем палец; расчёт идёт в updateJoystick каждый кадр,
+    // поэтому база продолжает догонять палец, даже если он замер
+    this.joystick.fingerX = pointer.x;
+    this.joystick.fingerY = pointer.y;
   }
 
   onPointerUp(pointer) {
@@ -206,40 +227,68 @@ class GameScene extends Phaser.Scene {
     this.resetJoystick();
   }
 
-  // Пересчитывает вектор джойстика по положению пальца
-  updateJoystick(pointer) {
-    const radius = CONFIG.JOYSTICK.RADIUS;
-    const deadZone = CONFIG.JOYSTICK.DEAD_ZONE;
-    const dx = pointer.x - this.joystick.baseX;
-    const dy = pointer.y - this.joystick.baseY;
-    const distance = Math.hypot(dx, dy);
-    const clamped = Math.min(distance, radius);
-    const strength = clamped / radius; // сила отклонения 0..1
-
-    if (distance < 0.001 || strength < deadZone) {
-      this.joystick.x = 0;
-      this.joystick.y = 0;
-    } else {
-      // Пересчитываем силу так, чтобы сразу за мёртвой зоной она начиналась с нуля
-      const power = (strength - deadZone) / (1 - deadZone);
-      this.joystick.x = (dx / distance) * power;
-      this.joystick.y = (dy / distance) * power;
+  // Плавающий джойстик: считает вектор движения и двигает базу за пальцем
+  updateJoystick(dt) {
+    const js = this.joystick;
+    if (js.pointerId === null) {
+      return;
     }
 
-    // Ручка джойстика — в направлении пальца, но не дальше радиуса
-    const knobX = distance > 0 ? this.joystick.baseX + (dx / distance) * clamped : this.joystick.baseX;
-    const knobY = distance > 0 ? this.joystick.baseY + (dy / distance) * clamped : this.joystick.baseY;
-    this.drawJoystick(knobX, knobY);
+    const radius = CONFIG.JOYSTICK.RADIUS;
+    const deadZone = CONFIG.JOYSTICK.DEAD_ZONE;
+    let dx = js.fingerX - js.baseX;
+    let dy = js.fingerY - js.baseY;
+    let distance = Math.hypot(dx, dy);
+
+    // 1. Палец ушёл дальше радиуса — база плавно подтягивается к нему,
+    //    стремясь остаться ровно на расстоянии RADIUS (без телепорта)
+    if (distance > radius) {
+      const targetX = js.fingerX - (dx / distance) * radius;
+      const targetY = js.fingerY - (dy / distance) * radius;
+      const k = 1 - Math.exp(-CONFIG.JOYSTICK.FOLLOW_SPEED * dt);
+      js.baseX += (targetX - js.baseX) * k;
+      js.baseY += (targetY - js.baseY) * k;
+
+      // Направление считаем уже от нового центра базы
+      dx = js.fingerX - js.baseX;
+      dy = js.fingerY - js.baseY;
+      distance = Math.hypot(dx, dy);
+    }
+
+    // 2. Сила отклонения 0..1 (физический радиус — 100 px)
+    const clamped = Math.min(distance, radius);
+    const strength = clamped / radius;
+
+    if (distance < 0.001 || strength < deadZone) {
+      js.x = 0;
+      js.y = 0;
+    } else {
+      // Сразу за мёртвой зоной сила начинается с нуля
+      const power = (strength - deadZone) / (1 - deadZone);
+      js.x = (dx / distance) * power;
+      js.y = (dy / distance) * power;
+    }
+
+    // 3. Рисуем: ручка смещается в пределах ВИЗУАЛЬНОГО радиуса базы
+    const visualOffset = strength * CONFIG.JOYSTICK.VISUAL_RADIUS;
+    const knobX = distance > 0.001 ? js.baseX + (dx / distance) * visualOffset : js.baseX;
+    const knobY = distance > 0.001 ? js.baseY + (dy / distance) * visualOffset : js.baseY;
+    const isMoving = js.x !== 0 || js.y !== 0;
+    this.drawJoystick(knobX, knobY, isMoving);
   }
 
-  drawJoystick(knobX, knobY) {
+  drawJoystick(knobX, knobY, isMoving) {
     const graphics = this.joystickGraphics;
+    const visualRadius = CONFIG.JOYSTICK.VISUAL_RADIUS;
     graphics.clear();
 
+    // Во время движения джойстик полупрозрачнее, чтобы не закрывать игру
+    graphics.setAlpha(isMoving ? CONFIG.JOYSTICK.ACTIVE_ALPHA : 1);
+
     graphics.fillStyle(0xffffff, 0.06);
-    graphics.fillCircle(this.joystick.baseX, this.joystick.baseY, CONFIG.JOYSTICK.RADIUS);
+    graphics.fillCircle(this.joystick.baseX, this.joystick.baseY, visualRadius);
     graphics.lineStyle(4, 0xffffff, 0.35);
-    graphics.strokeCircle(this.joystick.baseX, this.joystick.baseY, CONFIG.JOYSTICK.RADIUS);
+    graphics.strokeCircle(this.joystick.baseX, this.joystick.baseY, visualRadius);
 
     graphics.fillStyle(CONFIG.COLORS.PLAYER, 0.55);
     graphics.fillCircle(knobX, knobY, CONFIG.JOYSTICK.KNOB_RADIUS);
