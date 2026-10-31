@@ -39,10 +39,14 @@ class MenuScene extends Phaser.Scene {
   // Маленькая «картинка» из игровых фигур: игрок, три врага и бонус
   createIllustration(centerX) {
     this.add.image(centerX, 590, 'player');
-    // Три врага: Охотник, Перехватчик, Тяжёлый загонщик
-    this.add.image(centerX, 450, 'enemy-hunter').setRotation(Math.PI / 2);
-    this.add.image(centerX + 150, 500, 'enemy-interceptor');
-    this.add.image(centerX - 150, 500, 'enemy-heavy');
+    // Три врага (пациенты) с кольцами цвета роли: Загонщик, Охотник, Перехватчик
+    const ring = CONFIG.CHASER.RING;
+    const graphics = this.add.graphics();
+    [[centerX - 160, 525, 2], [centerX, 465, 0], [centerX + 160, 525, 1]].forEach(([x, y, roleIndex]) => {
+      graphics.lineStyle(4, CONFIG.CHASER.ROLES[roleIndex].color, 0.9);
+      graphics.strokeEllipse(x, y + ring.OFFSET_Y, ring.WIDTH, ring.HEIGHT);
+      this.add.image(x, y, 'enemy-patient').setFlipX(x < centerX);
+    });
     this.add.image(centerX + 210, 620, 'bonus');
   }
 

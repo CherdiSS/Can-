@@ -45,10 +45,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     this.lastDashInterval = 0;
     this.pathLine = new Phaser.Geom.Line();
 
-    // Светящееся ядро (отдельная картинка, смещается в сторону движения)
-    this.core = scene.add.image(this.x, this.y, 'enemy-core').setTint(role.color).setDepth(10);
-
-    // Шлейф и подсказки рывка рисуем в своей графике под врагом
+    // Кольцо цвета роли, шлейф и подсказки рывка рисуем в своей графике под врагом
     this.fx = scene.add.graphics().setDepth(8);
     this.trail = [];
     this.trailTimer = 0;
@@ -359,31 +356,21 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
   }
 
   // ---------------------------------------------------------------
-  // Визуальная часть: поворот, ядро, шлейф, подсказки рывка
+  // Визуальная часть: зеркалирование, мигание, кольцо, шлейф, подсказки рывка
   // ---------------------------------------------------------------
   updateVisuals(dt) {
     const cx = this.body.center.x;
     const cy = this.body.center.y;
 
-    // Направление «взгляда»: при телеграфе — направление рывка, иначе — движение
-    let lookX = this.moveVelocity.x;
-    let lookY = this.moveVelocity.y;
-    if (this.dashState === 'telegraph') {
-      lookX = this.dashDirection.x;
-      lookY = this.dashDirection.y;
+    // Пациент смотрит вправо (шприц справа). Двигается влево — зеркалим.
+    // При телеграфе смотрит туда, куда будет рывок.
+    const lookX = this.dashState === 'telegraph' ? this.dashDirection.x : this.moveVelocity.x;
+    const threshold = this.dashState === 'telegraph' ? 0.01 : 15; // порог — чтобы не «дёргался»
+    if (lookX > threshold) {
+      this.setFlipX(false);
+    } else if (lookX < -threshold) {
+      this.setFlipX(true);
     }
-    const lookLength = Math.hypot(lookX, lookY);
-    const hasDirection = lookLength > 0.001;
-
-    if (this.role.rotates && hasDirection && (this.dashState === 'telegraph' || lookLength > 10)) {
-      this.setRotation(Math.atan2(lookY, lookX));
-    }
-
-    // Ядро смещено в сторону движения
-    const offset = this.role.size * 0.16;
-    const ox = hasDirection ? (lookX / lookLength) * offset : 0;
-    const oy = hasDirection ? (lookY / lookLength) * offset : 0;
-    this.core.setPosition(cx + ox, cy + oy);
 
     // Мигание при телеграфе, затемнение при восстановлении
     if (this.dashState === 'telegraph') {
@@ -393,10 +380,8 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
       } else {
         this.clearTint();
       }
-      this.core.clearTint().setScale(1.4);
     } else {
       this.clearTint();
-      this.core.setTint(this.dashState === 'dash' ? 0xffffff : this.role.color).setScale(1);
     }
     const isRecovering = this.dashState === 'chase' && this.recoveryTimer > 0;
     this.setAlpha(isRecovering ? 0.6 : 1);
@@ -421,7 +406,14 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     const g = this.fx;
     const color = this.role.color;
     const count = this.trail.length;
+    const ring = CONFIG.CHASER.RING;
     g.clear();
+
+    // Неоновое кольцо цвета роли у ног — по нему различаются три врага
+    g.fillStyle(color, 0.18);
+    g.fillEllipse(cx, cy + ring.OFFSET_Y, ring.WIDTH, ring.HEIGHT);
+    g.lineStyle(4, color, 0.95);
+    g.strokeEllipse(cx, cy + ring.OFFSET_Y, ring.WIDTH, ring.HEIGHT);
 
     // Сужающийся шлейф: точки всё меньше и прозрачнее
     for (let i = 0; i < count; i++) {

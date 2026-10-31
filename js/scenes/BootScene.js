@@ -1,6 +1,6 @@
 // =============================================================
-// BootScene — первая сцена. Внешних картинок нет, поэтому здесь
-// мы рисуем простые фигуры и превращаем их в текстуры.
+// BootScene — первая сцена. Загружает пиксель-арт врагов,
+// а остальные простые фигуры рисует и превращает в текстуры.
 // =============================================================
 
 class BootScene extends Phaser.Scene {
@@ -8,9 +8,13 @@ class BootScene extends Phaser.Scene {
     super('BootScene');
   }
 
+  preload() {
+    this.load.image('enemy-patient-source', CONFIG.CHASER.SPRITE_SOURCE);
+  }
+
   create() {
     this.createCircleTexture('player', CONFIG.PLAYER.SIZE, CONFIG.COLORS.PLAYER);
-    this.createEnemyTextures();
+    this.createEnemyTexture();
     this.createCircleTexture('bonus', CONFIG.BONUS.SIZE, CONFIG.COLORS.BONUS);
 
     this.scene.start('MenuScene');
@@ -35,66 +39,19 @@ class BootScene extends Phaser.Scene {
     graphics.destroy();
   }
 
-  // Формы врагов: Охотник — стрела, Перехватчик — ромб, Загонщик — шестиугольник.
-  // Ядро рисуется отдельной картинкой (Chaser смещает его в сторону движения).
-  createEnemyTextures() {
-    CONFIG.CHASER.ROLES.forEach((role) => {
-      const points = this.getEnemyShape(role.key, role.size);
-      this.createPolygonTexture(role.texture, role.size, role.color, points);
-    });
+  // Текстура врагов: PNG 128×128 уменьшаем до SPRITE_SIZE один раз, без сглаживания,
+  // и ставим фильтр NEAREST, чтобы пиксель-арт не размывался
+  createEnemyTexture() {
+    const size = CONFIG.CHASER.SPRITE_SIZE;
+    const source = this.textures.get('enemy-patient-source').getSourceImage();
 
-    // Белое ядро — Chaser окрашивает его в цвет роли через setTint
-    const coreSize = 20;
-    const graphics = this.make.graphics({ x: 0, y: 0 }, false);
-    graphics.fillStyle(0xffffff, 1);
-    graphics.fillCircle(coreSize / 2, coreSize / 2, coreSize / 2);
-    graphics.generateTexture('enemy-core', coreSize, coreSize);
-    graphics.destroy();
-  }
+    const texture = this.textures.createCanvas('enemy-patient', size, size);
+    const context = texture.getContext();
+    context.imageSmoothingEnabled = false;
+    context.drawImage(source, 0, 0, size, size);
+    texture.refresh();
+    texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
-  // Вершины фигуры внутри квадрата size×size (отступ под толщину контура)
-  getEnemyShape(key, size) {
-    const pad = 4;
-    const c = size / 2;
-    const r = c - pad;
-
-    if (key === 'hunter') {
-      // Стрела, остриём вправо (угол 0 — направление движения)
-      return [
-        { x: size - pad, y: c },
-        { x: pad, y: pad + 2 },
-        { x: size * 0.3, y: c },
-        { x: pad, y: size - pad - 2 }
-      ];
-    }
-
-    if (key === 'interceptor') {
-      // Ромб
-      return [
-        { x: c, y: pad },
-        { x: size - pad, y: c },
-        { x: c, y: size - pad },
-        { x: pad, y: c }
-      ];
-    }
-
-    // Шестиугольник
-    const points = [];
-    for (let i = 0; i < 6; i++) {
-      const angle = Math.PI / 3 * i;
-      points.push({ x: c + Math.cos(angle) * r, y: c + Math.sin(angle) * r });
-    }
-    return points;
-  }
-
-  // Неоновый многоугольник: полупрозрачная заливка и яркий контур
-  createPolygonTexture(key, size, color, points) {
-    const graphics = this.make.graphics({ x: 0, y: 0 }, false);
-    graphics.fillStyle(color, 0.25);
-    graphics.fillPoints(points, true);
-    graphics.lineStyle(5, color, 1);
-    graphics.strokePoints(points, true);
-    graphics.generateTexture(key, size, size);
-    graphics.destroy();
+    this.textures.remove('enemy-patient-source'); // исходник больше не нужен
   }
 }

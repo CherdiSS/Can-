@@ -46,6 +46,13 @@ const CONFIG = {
 
   CHASER: {
     HITBOX_RADIUS: 25,      // у всех ролей одинаковый круглый хитбокс (столкновения не менялись)
+
+    // Текстура врагов — пиксель-арт «пациент со шприцем» (assets/enemies/patient_syringe.png).
+    // Исходник 128×128 один раз уменьшается до SPRITE_SIZE без сглаживания (nearest-neighbor).
+    SPRITE_SOURCE: 'assets/enemies/patient_syringe.png',
+    SPRITE_SIZE: 96,
+    // Неоновое кольцо цвета роли у ног — по нему различаются три врага
+    RING: { OFFSET_Y: 38, WIDTH: 70, HEIGHT: 22 },
     SEPARATION_RADIUS: 110, // ближе этого расстояния враги отталкиваются
     SEPARATION_FORCE: 1.5,
     SLIDE_TIME: 0.35,       // сколько секунд враг скользит вдоль препятствия
@@ -69,10 +76,9 @@ const CONFIG = {
       {
         key: 'hunter',
         name: 'Охотник',
-        texture: 'enemy-hunter',
-        color: 0xff3b5c,      // красный
-        size: 60,
-        rotates: true,        // стрела поворачивается по направлению движения
+        texture: 'enemy-patient',
+        color: 0xff3b5c,      // красный (цвет кольца и шлейфа)
+        size: 96,             // = SPRITE_SIZE
         start: { x: 540, y: 171 },
         speedFactor: 0.94,
         turnBase: 3.5,
@@ -82,10 +88,9 @@ const CONFIG = {
       {
         key: 'interceptor',
         name: 'Перехватчик',
-        texture: 'enemy-interceptor',
+        texture: 'enemy-patient',
         color: 0xd94bff,      // пурпурный
-        size: 58,
-        rotates: false,
+        size: 96,
         start: { x: 930, y: 140 },
         speedFactor: 0.90,
         turnBase: 2.6,
@@ -98,10 +103,9 @@ const CONFIG = {
       {
         key: 'heavy',
         name: 'Тяжёлый загонщик',
-        texture: 'enemy-heavy',
+        texture: 'enemy-patient',
         color: 0xff8c1a,      // оранжевый
-        size: 66,
-        rotates: false,
+        size: 96,
         start: { x: 150, y: 140 },
         speedFactor: 0.82,
         turnBase: 1.3,
