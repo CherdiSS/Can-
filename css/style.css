@@ -1,3 +1,11 @@
+/* Размеры панели управления (CSS px). Значения по умолчанию;
+   joystick.js пересчитывает их под экран при загрузке и при изменении размера */
+:root {
+  --panel-h: 160px;
+  --base-r: 60px;
+  --knob-r: 25px;
+}
+
 /* Базовый сброс и запрет любых «браузерных» жестов во время игры */
 html,
 body {
@@ -25,14 +33,73 @@ body {
   font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* Контейнер игры с отступами под «чёлку» и полоску жестов iPhone */
+/* Экран из трёх областей:
+   #game-container — HUD + арена (canvas Phaser), сверху;
+   #control-panel  — панель с джойстиком, снизу, своё место (не оверлей). */
 #game-container {
   position: absolute;
   top: env(safe-area-inset-top, 0px);
   right: env(safe-area-inset-right, 0px);
-  bottom: env(safe-area-inset-bottom, 0px);
+  bottom: calc(var(--panel-h) + env(safe-area-inset-bottom, 0px));
   left: env(safe-area-inset-left, 0px);
   overflow: hidden;
+}
+
+#control-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--panel-h) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px); /* джойстик выше полоски жестов iPhone */
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #080a18;
+  border-top: 2px solid rgba(60, 240, 255, 0.35);
+  touch-action: none;
+}
+
+/* База — неподвижный круг по центру панели */
+#joystick-base {
+  position: relative;
+  width: calc(var(--base-r) * 2);
+  height: calc(var(--base-r) * 2);
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  box-sizing: border-box;
+  touch-action: none;
+  visibility: hidden; /* в меню джойстика нет, панель остаётся — компоновка не прыгает */
+}
+
+#control-panel.is-game #joystick-base {
+  visibility: visible;
+}
+
+/* Пауза или поражение — джойстик приглушён и не реагирует */
+#control-panel.is-inactive #joystick-base {
+  opacity: 0.4;
+}
+
+#joystick-base.is-held {
+  border-color: rgba(60, 240, 255, 0.8);
+}
+
+/* Ручка: смещается относительно центра базы через transform */
+#joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--knob-r) * 2);
+  height: calc(var(--knob-r) * 2);
+  margin-left: calc(var(--knob-r) * -1);
+  margin-top: calc(var(--knob-r) * -1);
+  border-radius: 50%;
+  background: rgba(60, 240, 255, 0.6);
+  pointer-events: none;
+  will-change: transform;
 }
 
 #game-container canvas {

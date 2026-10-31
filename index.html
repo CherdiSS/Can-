@@ -12,8 +12,15 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- Сюда Phaser вставит canvas с игрой -->
+  <!-- Сюда Phaser вставит canvas с игрой (HUD + арена) -->
   <div id="game-container"></div>
+
+  <!-- Нижняя панель управления: своё место на экране, не поверх арены -->
+  <div id="control-panel">
+    <div id="joystick-base">
+      <div id="joystick-knob"></div>
+    </div>
+  </div>
 
   <!-- Подсказка для горизонтальной ориентации телефона -->
   <div id="rotate-notice">Поверните телефон вертикально</div>
@@ -24,6 +31,7 @@
   <!-- Порядок важен: сначала настройки и утилиты, затем объекты, сцены и запуск -->
   <script src="js/config.js"></script>
   <script src="js/utils/storage.js"></script>
+  <script src="js/utils/joystick.js"></script>
   <script src="js/objects/Player.js"></script>
   <script src="js/objects/Chaser.js"></script>
   <script src="js/objects/Bonus.js"></script>

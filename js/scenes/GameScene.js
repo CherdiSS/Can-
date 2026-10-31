@@ -17,11 +17,6 @@ class GameScene extends Phaser.Scene {
     this.lastHudSecond = -1;
     this.isGameOver = false;
     this.hasMoved = false;       // двигался ли игрок (для подсказки)
-
-    // Состояние джойстика:
-    // baseX/baseY — центр базы, fingerX/fingerY — где сейчас палец,
-    // x, y — итоговый вектор направления длиной 0..1
-    this.joystick = { pointerId: null, baseX: 0, baseY: 0, fingerX: 0, fingerY: 0, x: 0, y: 0 };
   }
 
   create() {
@@ -35,8 +30,10 @@ class GameScene extends Phaser.Scene {
     this.createBonus();
     this.setupCollisions();
     this.setupKeyboard();
-    this.setupJoystick();
     this.createStartHint();
+
+    // Фиксированный джойстик в нижней панели (js/utils/joystick.js)
+    Joystick.setEnabled(true);
 
     // Пауза/продолжение (их вызывает UIScene)
     this.events.on('pause', this.onScenePause, this);
@@ -59,7 +56,6 @@ class GameScene extends Phaser.Scene {
     this.elapsed += dt;
 
     const difficulty = this.getDifficulty(this.elapsed);
-    this.updateJoystick(dt); // база плавно следует за пальцем каждый кадр
     const input = this.getMoveInput();
 
     this.player.move(input.x, input.y, dt);
@@ -116,11 +112,6 @@ class GameScene extends Phaser.Scene {
     this.obstacles = this.physics.add.staticGroup();
 
     CONFIG.OBSTACLES.forEach((item) => {
-      // Нижняя безопасная зона должна оставаться свободной для пальца
-      if (item.y + item.h / 2 > CONFIG.BOTTOM_SAFE_ZONE_TOP) {
-        console.warn('Препятствие заходит в нижнюю безопасную зону и пропущено:', item);
-        return;
-      }
       const rect = this.add.rectangle(item.x, item.y, item.w, item.h, CONFIG.COLORS.OBSTACLE_FILL);
       rect.setStrokeStyle(3, CONFIG.COLORS.OBSTACLE_STROKE);
       this.obstacles.add(rect);
@@ -177,146 +168,15 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  setupJoystick() {
-    // Джойстик запускается по всей арене ниже HUD
-    this.joystickZoneTop = CONFIG.ARENA_TOP;
-    this.joystickGraphics = this.add.graphics().setDepth(100);
-
-    this.input.on('pointerdown', this.onPointerDown, this);
-    this.input.on('pointermove', this.onPointerMove, this);
-    this.input.on('pointerup', this.onPointerUp, this);
-    this.input.on('pointerupoutside', this.onPointerUp, this);
-  }
-
   createStartHint() {
     this.startHint = createText(
       this,
       CONFIG.WIDTH / 2,
-      CONFIG.BOTTOM_SAFE_ZONE_TOP - 140,
-      'Коснись арены в любом месте\nи тяни пальцем',
-      36,
+      1000, // свободная полоса между боковыми стенками и нижним препятствием
+      'Управляй джойстиком внизу экрана',
+      32,
       CONFIG.COLORS.TEXT_DIM
     ).setAlpha(0.8).setDepth(50);
-  }
-
-  // Касание рядом с кнопкой паузы не должно двигать персонажа
-  isInPauseSafeZone(x, y) {
-    const zone = CONFIG.JOYSTICK.PAUSE_SAFE_ZONE;
-    return x >= zone.left && y <= zone.bottom;
-  }
-
-  onPointerDown(pointer) {
-    // Второй палец игнорируем, пока первый держит джойстик
-    if (this.isGameOver || this.joystick.pointerId !== null) {
-      return;
-    }
-    // HUD и область у паузы не запускают джойстик.
-    // Нажатия на кнопки UIScene сюда вообще не доходят: сцена интерфейса выше,
-    // и Phaser (input.topOnly) останавливает событие на нажатой кнопке.
-    if (pointer.y <= this.joystickZoneTop || this.isInPauseSafeZone(pointer.x, pointer.y)) {
-      return;
-    }
-
-    // База появляется точно под пальцем — касание само по себе не даёт движения
-    this.joystick.pointerId = pointer.id;
-    this.joystick.baseX = pointer.x;
-    this.joystick.baseY = pointer.y;
-    this.joystick.fingerX = pointer.x;
-    this.joystick.fingerY = pointer.y;
-    this.updateJoystick(0);
-  }
-
-  onPointerMove(pointer) {
-    if (pointer.id !== this.joystick.pointerId) {
-      return;
-    }
-    // Только запоминаем палец; расчёт идёт в updateJoystick каждый кадр,
-    // поэтому база продолжает догонять палец, даже если он замер
-    this.joystick.fingerX = pointer.x;
-    this.joystick.fingerY = pointer.y;
-  }
-
-  onPointerUp(pointer) {
-    if (pointer.id !== this.joystick.pointerId) {
-      return;
-    }
-    this.resetJoystick();
-  }
-
-  // Плавающий джойстик: считает вектор движения и двигает базу за пальцем
-  updateJoystick(dt) {
-    const js = this.joystick;
-    if (js.pointerId === null) {
-      return;
-    }
-
-    const radius = CONFIG.JOYSTICK.RADIUS;
-    const deadZone = CONFIG.JOYSTICK.DEAD_ZONE;
-    let dx = js.fingerX - js.baseX;
-    let dy = js.fingerY - js.baseY;
-    let distance = Math.hypot(dx, dy);
-
-    // 1. Палец ушёл дальше радиуса — база плавно подтягивается к нему,
-    //    стремясь остаться ровно на расстоянии RADIUS (без телепорта)
-    if (distance > radius) {
-      const targetX = js.fingerX - (dx / distance) * radius;
-      const targetY = js.fingerY - (dy / distance) * radius;
-      const k = 1 - Math.exp(-CONFIG.JOYSTICK.FOLLOW_SPEED * dt);
-      js.baseX += (targetX - js.baseX) * k;
-      js.baseY += (targetY - js.baseY) * k;
-
-      // Направление считаем уже от нового центра базы
-      dx = js.fingerX - js.baseX;
-      dy = js.fingerY - js.baseY;
-      distance = Math.hypot(dx, dy);
-    }
-
-    // 2. Сила отклонения 0..1 (физический радиус — 100 px)
-    const clamped = Math.min(distance, radius);
-    const strength = clamped / radius;
-
-    if (distance < 0.001 || strength < deadZone) {
-      js.x = 0;
-      js.y = 0;
-    } else {
-      // Сразу за мёртвой зоной сила начинается с нуля
-      const power = (strength - deadZone) / (1 - deadZone);
-      js.x = (dx / distance) * power;
-      js.y = (dy / distance) * power;
-    }
-
-    // 3. Рисуем: ручка смещается в пределах ВИЗУАЛЬНОГО радиуса базы
-    const visualOffset = strength * CONFIG.JOYSTICK.VISUAL_RADIUS;
-    const knobX = distance > 0.001 ? js.baseX + (dx / distance) * visualOffset : js.baseX;
-    const knobY = distance > 0.001 ? js.baseY + (dy / distance) * visualOffset : js.baseY;
-    const isMoving = js.x !== 0 || js.y !== 0;
-    this.drawJoystick(knobX, knobY, isMoving);
-  }
-
-  drawJoystick(knobX, knobY, isMoving) {
-    const graphics = this.joystickGraphics;
-    const visualRadius = CONFIG.JOYSTICK.VISUAL_RADIUS;
-    graphics.clear();
-
-    // Во время движения джойстик полупрозрачнее, чтобы не закрывать игру
-    graphics.setAlpha(isMoving ? CONFIG.JOYSTICK.ACTIVE_ALPHA : 1);
-
-    graphics.fillStyle(0xffffff, 0.06);
-    graphics.fillCircle(this.joystick.baseX, this.joystick.baseY, visualRadius);
-    graphics.lineStyle(4, 0xffffff, 0.35);
-    graphics.strokeCircle(this.joystick.baseX, this.joystick.baseY, visualRadius);
-
-    graphics.fillStyle(CONFIG.COLORS.PLAYER, 0.55);
-    graphics.fillCircle(knobX, knobY, CONFIG.JOYSTICK.KNOB_RADIUS);
-  }
-
-  resetJoystick() {
-    this.joystick.pointerId = null;
-    this.joystick.x = 0;
-    this.joystick.y = 0;
-    if (this.joystickGraphics) {
-      this.joystickGraphics.clear();
-    }
   }
 
   // Итоговое направление движения: джойстик важнее клавиатуры
@@ -324,9 +184,11 @@ class GameScene extends Phaser.Scene {
     let x = 0;
     let y = 0;
 
-    if (this.joystick.pointerId !== null) {
-      x = this.joystick.x;
-      y = this.joystick.y;
+    const stick = Joystick.getVector();
+    if (stick) {
+      // Длина вектора джойстика уже не больше 1 — диагональ не быстрее прямой
+      x = stick.x;
+      y = stick.y;
     } else if (this.keys) {
       const k = this.keys;
       x = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0);
@@ -479,7 +341,7 @@ class GameScene extends Phaser.Scene {
     this.physics.pause();
     this.player.stop();
     this.player.setTintFill(0xffffff);
-    this.resetJoystick();
+    Joystick.setActive(false); // палец больше не управляет персонажем
 
     this.events.emit('player-caught');
 
@@ -516,12 +378,12 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   onScenePause() {
-    // Палец могут отпустить, пока игра на паузе, — сбрасываем джойстик заранее
-    this.resetJoystick();
+    // На паузе джойстик сброшен и не принимает ввод
+    Joystick.setActive(false);
   }
 
   onSceneResume() {
-    this.resetJoystick();
+    Joystick.setActive(true);
     if (this.input.keyboard) {
       this.input.keyboard.resetKeys(); // чтобы клавиши не «залипли»
     }
@@ -531,9 +393,7 @@ class GameScene extends Phaser.Scene {
     // События сцены живут между перезапусками — снимаем свои подписки
     this.events.off('pause', this.onScenePause, this);
     this.events.off('resume', this.onSceneResume, this);
-    this.input.off('pointerdown', this.onPointerDown, this);
-    this.input.off('pointermove', this.onPointerMove, this);
-    this.input.off('pointerup', this.onPointerUp, this);
-    this.input.off('pointerupoutside', this.onPointerUp, this);
+    // Уходим из игры (меню или рестарт) — джойстик прячется и сбрасывается
+    Joystick.setEnabled(false);
   }
 }

@@ -9,7 +9,7 @@ const gameConfig = {
   height: CONFIG.HEIGHT,
   backgroundColor: colorToCss(CONFIG.COLORS.BACKGROUND),
 
-  // FIT — вписываем поле 9:16 в контейнер (100dvh минус safe-area) без искажений
+  // FIT — вписываем поле 9:16 в контейнер (экран минус safe-area и панель управления) без искажений
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
@@ -24,7 +24,7 @@ const gameConfig = {
     }
   },
 
-  // Поддержка нескольких касаний (второй палец не ломает джойстик)
+  // Несколько касаний: палец на джойстике + нажатие кнопки паузы
   input: {
     activePointers: 3
   },
@@ -33,7 +33,11 @@ const gameConfig = {
   scene: [BootScene, MenuScene, GameScene, UIScene]
 };
 
+// Сначала размечаем нижнюю панель — чтобы Phaser сразу получил правильный размер контейнера
+Joystick.init();
+
 const game = new Phaser.Game(gameConfig);
+Joystick.game = game; // для пересчёта масштаба при изменении размера окна
 
 // Запрещаем браузерные жесты: прокрутку, pinch-to-zoom (iOS), двойной тап и меню
 function blockBrowserGestures() {
