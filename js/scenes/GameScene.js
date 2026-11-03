@@ -124,7 +124,8 @@ class GameScene extends Phaser.Scene {
     const camera = this.cameras.main;
     camera.setViewport(0, 0, CONFIG.WIDTH, this.scale.height);
     camera.setBounds(0, 0, CONFIG.ARENA.WIDTH, CONFIG.ARENA.HEIGHT);
-    camera.startFollow(this.player, true, 0.15, 0.15);
+    // Без запаздывания: остановилась героиня — сразу стоит и экран
+    camera.startFollow(this.player, true, CONFIG.PLAYER.CAMERA_LERP, CONFIG.PLAYER.CAMERA_LERP);
   }
 
   onResize() {
@@ -463,6 +464,7 @@ class GameScene extends Phaser.Scene {
     this.physics.pause();
     this.player.stop();
     this.player.setTintFill(0xffffff);
+    this.chasers.forEach((chaser) => chaser.anims.pause()); // все замирают в момент поимки
     Joystick.setActive(false); // палец больше не управляет персонажем
 
     this.events.emit('player-caught');

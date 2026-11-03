@@ -388,6 +388,17 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     const isRecovering = this.dashState === 'chase' && this.recoveryTimer > 0;
     this.setAlpha(isRecovering ? 0.6 : 1);
 
+    // Анимация: при телеграфе стоит лицом к рывку (дыхание), в рывке бежит вдвое чаще
+    const normalSpeed = CONFIG.PLAYER.SPEED * this.role.speedFactor;
+    if (this.dashState === 'telegraph') {
+      this.facingBack = this.dashDirection.y < 0 &&
+        -this.dashDirection.y > Math.abs(this.dashDirection.x) * CONFIG.ANIMATION.BACK_RATIO;
+      animateCharacter(this, 0, 0, normalSpeed);
+    } else {
+      animateCharacter(this, this.moveVelocity.x, this.moveVelocity.y, normalSpeed,
+        this.dashState === 'dash' ? 2 : 1);
+    }
+
     this.updateTrail(dt, cx, cy);
     this.drawFx(cx, cy);
   }

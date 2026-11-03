@@ -10,11 +10,13 @@ class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image(CONFIG.PLAYER.TEXTURE, CONFIG.PLAYER.SPRITE);
-    this.load.image(CONFIG.BONUS.TEXTURE, CONFIG.BONUS.SPRITE);
+    // Героиня и пациенты — листы кадров анимации (12 кадров 64×64 в ряд)
+    const frame = { frameWidth: CONFIG.ANIMATION.FRAME_SIZE, frameHeight: CONFIG.ANIMATION.FRAME_SIZE };
+    this.load.spritesheet(CONFIG.PLAYER.TEXTURE, CONFIG.PLAYER.SPRITE, frame);
     CONFIG.CHASER.ROLES.forEach((role) => {
-      this.load.image(role.texture, role.sprite);
+      this.load.spritesheet(role.texture, role.sprite, frame);
     });
+    this.load.image(CONFIG.BONUS.TEXTURE, CONFIG.BONUS.SPRITE);
 
     // Окружение поликлиники: пол, стены, детали пола и предметы-препятствия
     const env = CONFIG.ENVIRONMENT;
@@ -40,8 +42,28 @@ class BootScene extends Phaser.Scene {
       this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
 
+    this.createCharacterAnimations(CONFIG.PLAYER.TEXTURE, CONFIG.PLAYER.RUN_FPS);
+    CONFIG.CHASER.ROLES.forEach((role) => this.createCharacterAnimations(role.texture, role.runFps));
+
     // Ждём пиксельный шрифт: иначе первые надписи нарисуются запасным шрифтом
     this.waitForFont().then(() => this.scene.start('MenuScene'));
+  }
+
+  // Анимации одного персонажа: <ключ>-idle, -run, -back-idle, -back-run
+  createCharacterAnimations(key, runFps) {
+    const A = CONFIG.ANIMATION;
+    const make = (suffix, [start, end], frameRate) => {
+      this.anims.create({
+        key: key + suffix,
+        frames: this.anims.generateFrameNumbers(key, { start: start, end: end }),
+        frameRate: frameRate,
+        repeat: -1
+      });
+    };
+    make('-idle', A.FRAMES.IDLE, A.IDLE_FPS);
+    make('-run', A.FRAMES.RUN, runFps);
+    make('-back-idle', A.FRAMES.BACK_IDLE, A.IDLE_FPS);
+    make('-back-run', A.FRAMES.BACK_RUN, runFps);
   }
 
   waitForFont() {

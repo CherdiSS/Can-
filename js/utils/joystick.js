@@ -135,20 +135,31 @@ const Joystick = {
     const dx = px - cx;
     const dy = py - cy;
     const distance = Math.hypot(dx, dy);
-    const deadZone = CONFIG.JOYSTICK.DEAD_ZONE;
+    const J = CONFIG.JOYSTICK;
 
-    // Сила 0..1: за пределами радиуса — 1, направление продолжает считываться
+    // Отклонение 0..1: за пределами радиуса — 1, направление продолжает считываться
     const strength = Math.min(distance, r) / r;
 
-    if (distance < 0.001 || strength < deadZone) {
+    if (distance < 0.001 || strength < J.DEAD_ZONE) {
       this.x = 0;
       this.y = 0;
     } else {
-      // Сразу за мёртвой зоной сила начинается с нуля.
-      // Длина вектора не больше 1 — по диагонали игрок не быстрее, чем по прямой.
-      const power = (strength - deadZone) / (1 - deadZone);
-      this.x = (dx / distance) * power;
-      this.y = (dy / distance) * power;
+      // Сразу за мёртвой зоной сила начинается с нуля и достигает полной
+      // уже при FULL_SPEED_AT отклонения — не нужно тянуть палец к самому краю.
+      // Длина вектора не больше 1 — по диагонали не быстрее, чем по прямой.
+      const power = Math.min(1, (strength - J.DEAD_ZONE) / (J.FULL_SPEED_AT - J.DEAD_ZONE));
+
+      // Почти ровно вверх/вниз/вбок — «прилипаем» к прямой (удобно в проходах)
+      let angle = Math.atan2(dy, dx);
+      const axis = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2);
+      if (Math.abs(angle - axis) <= J.SNAP_ANGLE * Math.PI / 180) {
+        angle = axis;
+      }
+      this.x = Math.cos(angle) * power;
+      this.y = Math.sin(angle) * power;
+      // Убираем «почти ноль» от cos/sin прямых углов
+      if (Math.abs(this.x) < 1e-9) this.x = 0;
+      if (Math.abs(this.y) < 1e-9) this.y = 0;
     }
 
     // Ручка не выходит за радиус базы

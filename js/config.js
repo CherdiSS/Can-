@@ -43,13 +43,16 @@ const CONFIG = {
   },
 
   PLAYER: {
-    // Героиня — пиксельная девушка-врач (assets/sprites/doctor.png, 64×64, рисуется без масштабирования)
+    // Героиня — пиксельная девушка-врач (assets/sprites/doctor_sheet.png: 12 кадров 64×64, без масштабирования)
     TEXTURE: 'player',
-    SPRITE: 'assets/sprites/doctor.png',
+    SPRITE: 'assets/sprites/doctor_sheet.png', // лист кадров 12×64×64 (см. ANIMATION)
+    RUN_FPS: 12,        // частота кадров бега на полной скорости
     SIZE: 64,           // размер спрайта
     HITBOX_RADIUS: 27,  // круглый хитбокс по центру спрайта (не менялся)
     SPEED: 330,         // максимальная скорость, пикс/сек
-    ACCELERATION: 18,   // чем больше, тем меньше инерция (18 — почти мгновенно)
+    ACCELERATION: 30,   // разгон: до полной скорости ≈ за 0.1 с
+    DECELERATION: 90,   // торможение: после отпускания героиня стоит через ≈ 0.05 с
+    CAMERA_LERP: 1,     // камера жёстко за героиней (1 — без запаздывания)
     START: { x: 540, y: 1618 } // низ поля по центру (те же 91% высоты, что раньше)
   },
 
@@ -84,7 +87,8 @@ const CONFIG = {
         key: 'hunter',
         name: 'Охотник',
         texture: 'enemy-hunter',
-        sprite: 'assets/sprites/enemy_hunter.png', // пациент со шприцем
+        sprite: 'assets/sprites/enemy_hunter_sheet.png', // пациент со шприцем
+        runFps: 12,           // широкий быстрый шаг
         color: 0xff3b5c,      // красный (контур, кольцо и шлейф)
         size: 64,             // размер спрайта
         start: { x: 540, y: 171 },
@@ -97,7 +101,8 @@ const CONFIG = {
         key: 'interceptor',
         name: 'Перехватчик',
         texture: 'enemy-interceptor',
-        sprite: 'assets/sprites/enemy_interceptor.png', // пациент с капельницей
+        sprite: 'assets/sprites/enemy_interceptor_sheet.png', // пациент с капельницей
+        runFps: 9,            // шаркает
         color: 0xd94bff,      // пурпурный
         size: 64,
         start: { x: 930, y: 140 },
@@ -113,7 +118,8 @@ const CONFIG = {
         key: 'heavy',
         name: 'Тяжёлый загонщик',
         texture: 'enemy-heavy',
-        sprite: 'assets/sprites/enemy_heavy.png', // пациент в бинтах и гипсе
+        sprite: 'assets/sprites/enemy_heavy_sheet.png', // пациент в бинтах и гипсе
+        runFps: 7,            // тяжёлая переваливающаяся походка
         color: 0xff8c1a,      // оранжевый
         size: 64,
         start: { x: 150, y: 140 },
@@ -175,10 +181,26 @@ const CONFIG = {
     BASE_RADIUS: 60,       // радиус базы
     KNOB_RADIUS: 25,       // радиус ручки
     BASE_TO_PANEL: 0.38,   // база не больше 38% высоты панели — всегда влезает с отступами
-    DEAD_ZONE: 0.1         // мёртвая зона — 10% радиуса
+    DEAD_ZONE: 0.15,       // мёртвая зона — 15% радиуса: палец у центра не даёт «ползания»
+    FULL_SPEED_AT: 0.6,    // полная скорость уже при 60% отклонения
+    SNAP_ANGLE: 8          // почти ровно вверх/вниз/вбок (±8°) — движение строго по прямой
   },
 
   CATCH_DELAY: 400, // мс между поимкой и экраном поражения
+
+  // Анимации персонажей: лист 12 кадров 64×64 в ряд (assets/sprites/make_sprites.py)
+  ANIMATION: {
+    FRAME_SIZE: 64,
+    FRAMES: {             // [первый, последний] кадр
+      IDLE: [0, 1],       // дыхание лицом к зрителю
+      RUN: [2, 5],        // бег лицом к зрителю
+      BACK_IDLE: [6, 7],  // дыхание спиной
+      BACK_RUN: [8, 11]   // бег спиной — когда персонаж бежит вверх по экрану
+    },
+    IDLE_FPS: 2,
+    MIN_RUN_SPEED: 25,    // медленнее — анимация дыхания
+    BACK_RATIO: 0.6       // вверх быстрее, чем 0.6 × вбок, — вид со спины
+  },
 
   // Стрелки у краёв экрана: где враги и таблетка, если их не видно
   INDICATORS: {
@@ -337,6 +359,21 @@ function createButton(scene, x, y, label, onClick, options = {}) {
 // Все части кнопки — для добавления в контейнер
 function buttonParts(button) {
   return [button.decor, button, button.label];
+}
+
+// Анимация персонажа по его скорости: стоит — дышит, бежит — бег.
+// Бежит вверх по экрану — вид со спины; остановился — остаётся лицом туда же.
+// normalSpeed — обычная скорость персонажа (на ней кадры идут с частотой runFps).
+function animateCharacter(sprite, vx, vy, normalSpeed, speedUp = 1) {
+  const A = CONFIG.ANIMATION;
+  const speed = Math.hypot(vx, vy);
+  const moving = speed > A.MIN_RUN_SPEED;
+  if (moving) {
+    sprite.facingBack = vy < 0 && -vy > Math.abs(vx) * A.BACK_RATIO;
+  }
+  const key = sprite.texture.key + (sprite.facingBack ? '-back' : '') + (moving ? '-run' : '-idle');
+  sprite.anims.play(key, true);
+  sprite.anims.timeScale = moving ? Phaser.Math.Clamp(speed / normalSpeed, 0.6, 2.5) * speedUp : 1;
 }
 
 // Ставит контейнер с вёрсткой по центру экрана и уменьшает его, если не помещается.

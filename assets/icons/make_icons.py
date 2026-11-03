@@ -11,8 +11,9 @@ BG = (122, 164, 140, 255)      # масляная панель стены
 NEON = (30, 36, 44, 255)       # тёмный контур — рамка иконки
 RED = (255, 59, 92, 255)       # цвет Охотника
 
-doctor = Image.open(os.path.join(SPRITES, 'doctor.png')).convert('RGBA')
-hunter = Image.open(os.path.join(SPRITES, 'enemy_hunter.png')).convert('RGBA')
+# Первый кадр листа анимации (64×64) — персонаж стоит лицом к зрителю
+doctor = Image.open(os.path.join(SPRITES, 'doctor_sheet.png')).convert('RGBA').crop((0, 0, 64, 64))
+hunter = Image.open(os.path.join(SPRITES, 'enemy_hunter_sheet.png')).convert('RGBA').crop((0, 0, 64, 64))
 
 
 def make_icon(size):

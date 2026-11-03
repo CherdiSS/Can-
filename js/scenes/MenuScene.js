@@ -69,7 +69,7 @@ class MenuScene extends Phaser.Scene {
     createText(this, centerX, 238, 'НЕОНОВЫЙ\nПОБЕГ', 92, CONFIG.COLORS.INK, { lineSpacing: -8 });
   }
 
-  // «Картинка» из персонажей игры: героиня-врач, три пациента и таблетка
+  // «Картинка» из персонажей игры: героиня-врач, три пациента и таблетка (с анимацией)
   createIllustration(centerX) {
     const scale = MENU_PIXEL_SCALE;
     const ring = CONFIG.CHASER.RING;
@@ -77,9 +77,11 @@ class MenuScene extends Phaser.Scene {
     [[centerX - 165, 525, 2], [centerX, 465, 0], [centerX + 165, 525, 1]].forEach(([x, y, roleIndex]) => {
       const role = CONFIG.CHASER.ROLES[roleIndex];
       this.add.image(x, y + ring.OFFSET_Y * scale, 'ui-ring').setScale(scale).setTint(role.color);
-      this.add.image(x, y, role.texture).setScale(scale).setFlipX(x < centerX);
+      // пациенты бегут на месте, у каждого — своя походка
+      this.add.sprite(x, y, role.texture).setScale(scale).setFlipX(x < centerX).play(role.texture + '-run');
     });
-    this.add.image(centerX, 600, CONFIG.PLAYER.TEXTURE).setScale(scale);
+    // героиня дышит
+    this.add.sprite(centerX, 600, CONFIG.PLAYER.TEXTURE).setScale(scale).play(CONFIG.PLAYER.TEXTURE + '-idle');
     this.add.image(centerX + 225, 650, CONFIG.BONUS.TEXTURE).setScale(scale);
   }
 
