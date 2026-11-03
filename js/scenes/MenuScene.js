@@ -66,7 +66,7 @@ class MenuScene extends Phaser.Scene {
   createTitle(centerX) {
     const plate = this.add.graphics();
     drawPlate(plate, centerX, 245, 600, 230, CONFIG.COLORS.PAPER, CONFIG.COLORS.PAPER_SHADE, 8);
-    createText(this, centerX, 238, 'НЕОНОВЫЙ\nПОБЕГ', 92, CONFIG.COLORS.INK, { lineSpacing: -8 });
+    createText(this, centerX, 238, 'СПИДозный\nЦГБ', 92, CONFIG.COLORS.INK, { lineSpacing: -8 });
   }
 
   // «Картинка» из персонажей игры: героиня-врач, три пациента и таблетка (с анимацией)
