@@ -5,7 +5,8 @@
 
 class Player extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
-    super(scene, x, y, 'player');
+    // Форма из гардероба (CONFIG.SKINS): у каждой свой лист кадров и анимации
+    super(scene, x, y, Progress.getSkin().texture);
 
     // Добавляем спрайт на сцену и в физический мир
     scene.add.existing(this);

@@ -7,8 +7,8 @@
 // =============================================================
 
 // Высота блоков оверлеев (их координаты — относительно центра экрана)
-const PAUSE_BLOCK_HEIGHT = 660;
-const GAME_OVER_BLOCK_HEIGHT = 860;
+const PAUSE_BLOCK_HEIGHT = 820;
+const GAME_OVER_BLOCK_HEIGHT = 1060;
 
 class UIScene extends Phaser.Scene {
   constructor() {
@@ -89,16 +89,34 @@ class UIScene extends Phaser.Scene {
     const shade = this.createShade(0.7);
 
     // Координаты — относительно центра экрана (контейнер ставится в центр)
-    const card = this.createCard(560, 640);
-    const title = createText(this, 0, -235, 'ПАУЗА', 84);
-    const resumeButton = createButton(this, 0, -75, 'ПРОДОЛЖИТЬ', () => this.resumeGame(), { primary: true });
-    const menuButton = createButton(this, 0, 70, 'В МЕНЮ', () => this.goToMenu(), { height: 112, fontSize: 44 });
-    this.soundButton = createButton(this, 0, 200, '', () => this.toggleSound(), { height: 100, fontSize: 38 });
+    const card = this.createCard(600, 800);
+    const title = createText(this, 0, -320, 'ПАУЗА', 84);
+    // Задания на смену с прогрессом (обновляются при каждой паузе)
+    this.pauseMissionTexts = [0, 1, 2].map((i) => createText(this, 0, -225 + i * 40, '', 26, CONFIG.COLORS.PAINT_LINE));
+    const resumeButton = createButton(this, 0, -35, 'ПРОДОЛЖИТЬ', () => this.resumeGame(), { primary: true });
+    const menuButton = createButton(this, 0, 110, 'В МЕНЮ', () => this.goToMenu(), { height: 112, fontSize: 44 });
+    this.soundButton = createButton(this, 0, 240, '', () => this.toggleSound(), { height: 100, fontSize: 38 });
     this.updateSoundLabel();
 
-    this.pauseContent = this.add.container(0, 0, [card, title].concat(
+    this.pauseContent = this.add.container(0, 0, [card, title].concat(this.pauseMissionTexts,
       buttonParts(resumeButton), buttonParts(menuButton), buttonParts(this.soundButton)));
-    this.pauseItems = [shade, card, title, resumeButton, menuButton, this.soundButton];
+    this.pauseItems = [shade, card, title].concat(this.pauseMissionTexts, [resumeButton, menuButton, this.soundButton]);
+  }
+
+  // Строка задания: «✓ Собери 5 таблеток» или «Собери 5 таблеток (2/5)»
+  missionLine(mission, value) {
+    return mission.done ? '+ ' + mission.text : mission.text + ' (' + Math.min(value, mission.goal) + '/' + mission.goal + ')';
+  }
+
+  updatePauseMissions() {
+    const game = this.gameScene;
+    game.missions.forEach((mission, i) => {
+      const text = this.pauseMissionTexts[i];
+      if (text) {
+        text.setText(this.missionLine(mission, game.missionValue(mission)));
+        text.setColor(colorToCss(mission.done ? CONFIG.COLORS.PAINT_DARK : CONFIG.COLORS.PAINT_LINE));
+      }
+    });
   }
 
   toggleSound() {
@@ -123,6 +141,7 @@ class UIScene extends Phaser.Scene {
     }
     this.state = 'paused';
     this.scene.pause('GameScene');
+    this.updatePauseMissions();
     setItemsVisible(this.pauseItems, true);
   }
 
@@ -201,41 +220,45 @@ class UIScene extends Phaser.Scene {
   createGameOverOverlay() {
     const C = CONFIG.COLORS;
     const shade = this.createShade(0.8);
-    const card = this.createCard(620, 840);
+    const card = this.createCard(640, 1040);
 
-    // «ПОЙМАН!» — красный штамп в рамке (без поворота — пиксели остаются ровными)
-    const stamp = this.add.graphics({ x: 0, y: -320 });
+    // Штамп — красная надпись в рамке (текст — случайный из открытых, см. гардероб)
+    const stamp = this.add.graphics({ x: 0, y: -405 });
     stamp.fillStyle(C.STAMP, 1);
-    stamp.fillRect(-232, -64, 464, 8);
-    stamp.fillRect(-232, 56, 464, 8);
-    stamp.fillRect(-232, -64, 8, 128);
-    stamp.fillRect(224, -64, 8, 128);
-    const title = createText(this, 0, -324, 'ПОЙМАН!', 88, C.STAMP);
+    stamp.fillRect(-250, -62, 500, 8);
+    stamp.fillRect(-250, 54, 500, 8);
+    stamp.fillRect(-250, -62, 8, 124);
+    stamp.fillRect(242, -62, 8, 124);
+    this.stampText = createText(this, 0, -409, 'ПОЙМАН!', 88, C.STAMP);
 
-    const scoreLabel = createText(this, 0, -200, 'Счёт', 34, C.PAINT_LINE);
-    this.finalScoreText = createText(this, 0, -138, '0', 100);
-    this.finalTimeText = createText(this, 0, -52, '', 40, C.PAINT_LINE);
-    this.newRecordText = createText(this, 0, 10, 'Новый рекорд!', 48, C.STAMP);
-    this.bestScoreText = createText(this, 0, 66, '', 32, C.PAINT_LINE);
+    const scoreLabel = createText(this, 0, -300, 'Счёт', 32, C.PAINT_LINE);
+    this.finalScoreText = createText(this, 0, -245, '0', 90);
+    this.finalTimeText = createText(this, 0, -175, '', 36, C.PAINT_LINE);
+    this.diagnosisText = createText(this, 0, -127, '', 32, C.INK);
+    this.newRecordText = createText(this, 0, -76, 'Новый рекорд!', 44, C.STAMP);
+    this.bestScoreText = createText(this, 0, -32, '', 28, C.PAINT_LINE);
+    this.missionsText = createText(this, 0, 12, '', 28, C.PAINT_DARK);
+    this.unlockText = createText(this, 0, 62, '', 26, C.STAMP, { lineSpacing: 2 });
 
-    const restartButton = createButton(this, 0, 195, 'ИГРАТЬ СНОВА', () => this.restartGame(), {
+    const restartButton = createButton(this, 0, 222, 'ИГРАТЬ СНОВА', () => this.restartGame(), {
       width: 500,
-      height: 140,
+      height: 130,
       fontSize: 52,
       primary: true
     });
-    const menuButton = createButton(this, 0, 330, 'В МЕНЮ', () => this.goToMenu(), {
+    const menuButton = createButton(this, 0, 360, 'В МЕНЮ', () => this.goToMenu(), {
       width: 380,
-      height: 110,
+      height: 104,
       fontSize: 44
     });
 
     this.gameOverContent = this.add.container(0, 0, [
-      card, stamp, title, scoreLabel, this.finalScoreText, this.finalTimeText, this.newRecordText, this.bestScoreText
+      card, stamp, this.stampText, scoreLabel, this.finalScoreText, this.finalTimeText, this.diagnosisText,
+      this.newRecordText, this.bestScoreText, this.missionsText, this.unlockText
     ].concat(buttonParts(restartButton), buttonParts(menuButton)));
     this.gameOverItems = [
-      shade, card, stamp, title, scoreLabel, this.finalScoreText, this.finalTimeText,
-      this.newRecordText, this.bestScoreText, restartButton, menuButton
+      shade, card, stamp, this.stampText, scoreLabel, this.finalScoreText, this.finalTimeText, this.diagnosisText,
+      this.newRecordText, this.bestScoreText, this.missionsText, this.unlockText, restartButton, menuButton
     ];
   }
 
@@ -251,8 +274,21 @@ class UIScene extends Phaser.Scene {
     this.finalScoreText.setText(String(result.score));
     this.finalTimeText.setText('Время: ' + formatTime(result.seconds));
     this.bestScoreText.setText('Рекорд: ' + result.bestScore);
+    this.diagnosisText.setText('Диагноз: ' + result.diagnosis);
+    const done = result.missions.filter((m) => m.done).length;
+    this.missionsText.setText('Задания: ' + done + ' из ' + result.missions.length);
+    this.unlockText.setText(result.unlocked.length ? 'Открыто: ' + result.unlocked.join(',\n') : '');
+
+    // Штамп: длинная надпись уменьшается, чтобы влезть в рамку
+    this.stampText.setText(result.stamp).setFontSize(88);
+    if (this.stampText.width > 450) {
+      this.stampText.setFontSize(Math.floor(88 * 450 / this.stampText.width));
+    }
 
     setItemsVisible(this.gameOverItems, true);
+    if (result.unlocked.length) {
+      Sound.play('mission');
+    }
     // «Новый рекорд!» показываем только при побитом рекорде
     this.newRecordText.setVisible(result.isNewRecord);
   }

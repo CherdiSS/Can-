@@ -39,6 +39,11 @@ class GameScene extends Phaser.Scene {
     this.npcs = [];
     this.puddles = [];
     this.slipNoticeTimer = 0;
+
+    // Задания на смену: выбраны в меню (при «Играть снова» — те же)
+    const ids = this.registry.get('missions') || Progress.rollMissions();
+    this.registry.set('missions', ids);
+    this.missions = ids.map((id) => Object.assign({ done: false }, CONFIG.MISSIONS.LIST.find((m) => m.id === id)));
   }
 
   create() {
@@ -150,6 +155,7 @@ class GameScene extends Phaser.Scene {
 
     this.updateBonusLifetime(dt, difficulty.phase);
     this.updateNearMisses(dt);
+    this.updateMissions();
     this.updateComboHud();
     this.updateScore();
     this.updateIndicators();
@@ -846,6 +852,28 @@ class GameScene extends Phaser.Scene {
     Sound.play('door');
   }
 
+  // ---------------------------------------------------------------
+  // Задания на смену
+  // ---------------------------------------------------------------
+
+  missionValue(mission) {
+    return mission.stat === 'time' ? Math.floor(this.elapsed) : this.stats[mission.stat];
+  }
+
+  updateMissions() {
+    this.missions.forEach((mission) => {
+      if (mission.done || this.missionValue(mission) < mission.goal) {
+        return;
+      }
+      mission.done = true;
+      const M = CONFIG.MISSIONS;
+      this.addPoints(M.POINTS, this.player.x, this.player.y - 70, 'задание! +' + M.POINTS, CONFIG.COLORS.BONUS);
+      this.popup(this.player.x, this.player.y - 110, mission.text, CONFIG.COLORS.PAPER);
+      Sound.play('mission');
+      Sound.vibrate([20, 30, 20]);
+    });
+  }
+
   // Комбо в панели: множитель и сколько осталось времени окна
   updateComboHud() {
     const left = CONFIG.COMBO.WINDOW - (this.elapsed - this.lastPillTime);
@@ -967,14 +995,22 @@ class GameScene extends Phaser.Scene {
   }
 
   finishGame() {
+    // Что было открыто до этой смены — чтобы показать новое (форма, штамп)
+    const wasOpen = Progress.unlockedNames(Progress.load());
     const isNewRecord = saveBestScore(this.score);
-    this.events.emit('game-over', {
+    const missionsDone = this.missions.filter((m) => m.done).length;
+    const result = {
       score: this.score,
       seconds: this.elapsed,
       isNewRecord: isNewRecord,
       bestScore: getBestScore(),
-      stats: this.stats
-    });
+      stats: this.stats,
+      missions: this.missions,
+      diagnosis: getDiagnosis(this.score),
+      stamp: Progress.randomStamp()
+    };
+    result.unlocked = Progress.recordGame(result, missionsDone, wasOpen);
+    this.events.emit('game-over', result);
   }
 
   // +10 за каждую полную секунду (кроме пряток) и накопленные очки за таблетки, комбо и т.д.

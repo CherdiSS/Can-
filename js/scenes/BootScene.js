@@ -13,6 +13,8 @@ class BootScene extends Phaser.Scene {
     // Героиня и пациенты — листы кадров анимации (12 кадров 64×64 в ряд)
     const frame = { frameWidth: CONFIG.ANIMATION.FRAME_SIZE, frameHeight: CONFIG.ANIMATION.FRAME_SIZE };
     this.load.spritesheet(CONFIG.PLAYER.TEXTURE, CONFIG.PLAYER.SPRITE, frame);
+    CONFIG.SKINS.filter((skin) => skin.texture !== CONFIG.PLAYER.TEXTURE)
+      .forEach((skin) => this.load.spritesheet(skin.texture, skin.sprite, frame));
     CONFIG.CHASER.ROLES.forEach((role) => {
       this.load.spritesheet(role.texture, role.sprite, frame);
     });
@@ -36,6 +38,7 @@ class BootScene extends Phaser.Scene {
   create() {
     // Фильтр NEAREST: при любом масштабировании пиксели остаются чёткими, без размытия
     const keys = [CONFIG.PLAYER.TEXTURE, CONFIG.BONUS.TEXTURE]
+      .concat(CONFIG.SKINS.filter((skin) => skin.texture !== CONFIG.PLAYER.TEXTURE).map((skin) => skin.texture))
       .concat(Object.values(CONFIG.PILLS.TYPES).map((pill) => pill.texture))
       .concat(CONFIG.CHASER.ROLES.map((role) => role.texture))
       .concat(['floor_tile', 'wall_north', 'wall_side', 'wall_bottom', 'decal_seam', 'decal_wear', 'decal_mat']
@@ -47,7 +50,7 @@ class BootScene extends Phaser.Scene {
       this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
 
-    this.createCharacterAnimations(CONFIG.PLAYER.TEXTURE, CONFIG.PLAYER.RUN_FPS);
+    CONFIG.SKINS.forEach((skin) => this.createCharacterAnimations(skin.texture, CONFIG.PLAYER.RUN_FPS));
     CONFIG.CHASER.ROLES.forEach((role) => this.createCharacterAnimations(role.texture, role.runFps));
     Object.values(CONFIG.NPC).forEach((npc) => this.createCharacterAnimations(npc.texture, npc.runFps));
 

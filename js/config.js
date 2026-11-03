@@ -297,6 +297,57 @@ const CONFIG = {
     CHASER_TURN: 0.25  // во сколько раз хуже поворачивают пациенты на мокром
   },
 
+  // Задания на смену: в меню выбираются 3 случайных (по разной статистике),
+  // за каждое выполненное — бонус. stat — поле статистики партии (time — секунды)
+  MISSIONS: {
+    PER_SHIFT: 3,
+    POINTS: 300,
+    LIST: [
+      { id: 'pills5', text: 'Собери 5 таблеток', stat: 'pills', goal: 5 },
+      { id: 'pills8', text: 'Собери 8 таблеток', stat: 'pills', goal: 8 },
+      { id: 'time45', text: 'Продержись 45 секунд', stat: 'time', goal: 45 },
+      { id: 'time75', text: 'Продержись 75 секунд', stat: 'time', goal: 75 },
+      { id: 'near3', text: 'Проскочи вплотную 3 раза', stat: 'nearMisses', goal: 3 },
+      { id: 'dashDodge2', text: 'Увернись от 2 рывков', stat: 'dashDodges', goal: 2 },
+      { id: 'combo3', text: 'Сделай комбо ×3', stat: 'maxCombo', goal: 3 },
+      { id: 'dodge5', text: 'Используй уворот 5 раз', stat: 'dodges', goal: 5 },
+      { id: 'hide1', text: 'Спрячься в кабинете', stat: 'hides', goal: 1 },
+      { id: 'special2', text: 'Возьми 2 особые таблетки', stat: 'specialPills', goal: 2 }
+    ]
+  },
+
+  // «Диагноз» по итогам партии (по очкам, от меньшего к большему)
+  DIAGNOSES: [
+    { score: 0, text: 'Острый случай' },
+    { score: 300, text: 'На больничном' },
+    { score: 700, text: 'Хроник' },
+    { score: 1200, text: 'Здорова как бык' },
+    { score: 2000, text: 'Главврач года' }
+  ],
+
+  // Гардероб: варианты формы героини. unlock — условие открытия
+  // (stat: bestScore — рекорд, bestTime — лучшее время, totalPills — таблеток за всё время,
+  //  totalMissions — выполнено заданий за всё время, games — сыграно смен)
+  SKINS: [
+    { key: 'classic', name: 'Классика', texture: 'player', sprite: 'assets/sprites/doctor_sheet.png', unlock: null },
+    { key: 'pink', name: 'Розовая смена', texture: 'player-pink', sprite: 'assets/sprites/doctor_pink_sheet.png',
+      unlock: { stat: 'bestScore', value: 600, text: 'рекорд 600 очков' } },
+    { key: 'night', name: 'Ночная смена', texture: 'player-night', sprite: 'assets/sprites/doctor_night_sheet.png',
+      unlock: { stat: 'totalPills', value: 30, text: '30 таблеток за всё время' } },
+    { key: 'surgeon', name: 'Хирург', texture: 'player-surgeon', sprite: 'assets/sprites/doctor_surgeon_sheet.png',
+      unlock: { stat: 'totalMissions', value: 5, text: '5 выполненных заданий' } },
+    { key: 'chief', name: 'Главврач', texture: 'player-chief', sprite: 'assets/sprites/doctor_chief_sheet.png',
+      unlock: { stat: 'bestTime', value: 90, text: 'продержаться 90 секунд' } }
+  ],
+
+  // Штампы на экране поражения (случайный из открытых)
+  STAMPS: [
+    { text: 'ПОЙМАН!', unlock: null },
+    { text: 'НА БОЛЬНИЧНЫЙ!', unlock: { stat: 'games', value: 5, text: 'сыграть 5 смен' } },
+    { text: 'В ОЧЕРЕДЬ!', unlock: { stat: 'bestScore', value: 1000, text: 'рекорд 1000 очков' } },
+    { text: 'ВЫПИСАНА!', unlock: { stat: 'totalMissions', value: 10, text: '10 выполненных заданий' } }
+  ],
+
   // Отсчёт 3-2-1 после паузы
   COUNTDOWN: {
     FROM: 3,

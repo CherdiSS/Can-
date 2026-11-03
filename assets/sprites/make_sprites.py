@@ -114,13 +114,25 @@ def legs(s, P, left, right, top, bottom, shoe_l, shoe_r, skin, skin_sh, shoe, sh
 
 
 # ---------------------------------------------------------------- героиня-врач
-def doctor(P=STAND):
+# Варианты формы героини (гардероб): цвет хирургического костюма, шапочка, очки, значок
+SKINS = {
+    "classic": dict(scrub=c(52, 160, 142), scrub_d=c(30, 108, 98)),
+    "pink": dict(scrub=c(232, 120, 170), scrub_d=c(176, 70, 120)),
+    "night": dict(scrub=c(64, 84, 156), scrub_d=c(38, 52, 106)),
+    "surgeon": dict(scrub=c(96, 172, 112), scrub_d=c(58, 122, 76), cap=(c(96, 172, 112), c(58, 122, 76))),
+    "chief": dict(scrub=c(124, 62, 74), scrub_d=c(84, 38, 48), glasses=True, badge=True),
+}
+
+
+def doctor(P=STAND, skin="classic"):
     s = Spr(64)
+    K = SKINS[skin]
     SKIN, SKIN_SH = c(242, 204, 178), c(208, 160, 140)
     HAIR, HAIR_L, HAIR_D = c(200, 122, 70), c(232, 166, 106), c(146, 80, 48)
     EYE = c(46, 170, 86)
     WHITE, COAT_SH = c(246, 248, 250), c(184, 198, 214)
-    SCRUB, SCRUB_D = c(52, 160, 142), c(30, 108, 98)
+    SCRUB, SCRUB_D = K["scrub"], K["scrub_d"]
+    GOLD = c(236, 196, 70)
     STETH, SILVER = c(70, 76, 92), c(178, 186, 200)
     RED = c(226, 52, 64)
     CYAN = c(60, 240, 255)       # цвет игрока (CONFIG.COLORS.PLAYER)
@@ -161,6 +173,8 @@ def doctor(P=STAND):
         s.put(35, 16, WHITE); s.put(35, 17, WHITE)
         s.put(25, 19, RED); s.put(38, 19, RED)           # румянец
         s.rect(31, 20, 32, 20, RED)                      # губы
+        if K.get("glasses"):                             # очки главврача
+            s.frame(24, 14, 29, 18, OUT); s.frame(33, 14, 38, 18, OUT); s.rect(30, 15, 32, 15, OUT)
     else:
         # затылок: волосы целиком, хвост по центру
         s.rrect(22, 5, 41, 23, 6, SKIN)
@@ -169,6 +183,11 @@ def doctor(P=STAND):
         s.rect(31, 6, 32, 14, HAIR_D)
         s.rect(29, 14, 34, 15, SCRUB)                    # резинка
         s.rrect(29, 16, 34, 30, 2, HAIR); s.rect(33, 17, 34, 29, HAIR_D)
+    if K.get("cap"):                                     # хирургическая шапочка
+        CAP, CAP_D = K["cap"]
+        s.rrect(20, 2, 43, 11, 4, CAP); s.rect(20, 9, 43, 11, CAP_D)
+        for x in range(23, 41, 4):
+            s.put(x, 5, CAP_D)
     # шея
     s.rect(29, 23, 34, 25, SKIN_SH)
     # халат
@@ -186,6 +205,8 @@ def doctor(P=STAND):
         # нагрудный карман с красным крестом
         s.rect(36, 35, 40, 40, COAT_SH)
         s.rect(38, 36, 38, 39, RED); s.rect(37, 37, 39, 38, RED)
+        if K.get("badge"):                               # золотой значок главврача
+            s.rect(22, 36, 26, 39, GOLD); s.rect(22, 39, 26, 39, c(180, 140, 40))
     else:
         s.rrect(29, 16, 34, 30, 2, HAIR); s.rect(33, 17, 34, 29, HAIR_D)   # хвост поверх воротника
         s.rect(31, 40, 32, 51, COAT_SH)                  # шлица
@@ -632,6 +653,10 @@ def sheet(draw, lift, swing, bob, sway):
 if __name__ == "__main__":
     for name, (draw, lift, swing, bob, sway) in CHARACTERS.items():
         sheet(draw, lift, swing, bob, sway).save(os.path.join(OUTDIR, name))
+    # Варианты формы героини (classic — это doctor_sheet.png выше)
+    for skin in SKINS:
+        if skin != "classic":
+            sheet(lambda P, skin=skin: doctor(P, skin), 3, 2, -1, 0).save(os.path.join(OUTDIR, "doctor_" + skin + "_sheet.png"))
     bonus().save("bonus_pill.png")
     for name, colors in PILLS.items():
         capsule(*colors).save(name)
