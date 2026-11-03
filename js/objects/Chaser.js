@@ -9,8 +9,8 @@
 // =============================================================
 
 class Chaser extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, role) {
-    super(scene, role.start.x, role.start.y, role.texture);
+  constructor(scene, role, x = role.start.x, y = role.start.y) {
+    super(scene, x, y, role.texture);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -48,7 +48,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     // Кольцо цвета роли, шлейф и подсказки рывка рисуем в своей графике под врагом
     this.fx = scene.add.graphics().setDepth(8);
     // Пиксельное кольцо цвета роли у ног (assets/ui/ring.png) — по нему различаются враги
-    this.ring = scene.add.image(role.start.x, role.start.y + CONFIG.CHASER.RING.OFFSET_Y, 'ui-ring').setTint(role.color).setDepth(7);
+    this.ring = scene.add.image(x, y + CONFIG.CHASER.RING.OFFSET_Y, 'ui-ring').setTint(role.color).setDepth(7);
     this.trail = [];
     this.trailTimer = 0;
   }
@@ -262,6 +262,13 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
+    // Только если пациента видно на экране (с отступом от края) — без прыжков из-за края
+    const margin = CONFIG.CHASER.DASH_VISIBLE_MARGIN;
+    if (ctx.view && !(this.x > ctx.view.x + margin && this.x < ctx.view.right - margin &&
+        this.y > ctx.view.y + margin && this.y < ctx.view.bottom - margin)) {
+      return;
+    }
+
     const player = ctx.player;
     const distance = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
     if (distance < CONFIG.CHASER.DASH_MIN_RANGE || distance > CONFIG.CHASER.DASH_MAX_RANGE) {
@@ -286,6 +293,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     }
 
     this.dashDirection.set(dirX, dirY);
+    this.scene.events.emit('chaser-telegraph', this);
     this.dashState = 'telegraph';
     this.stateTimer = this.role.dash.telegraph;
     this.lastDashInterval = ctx.dashInterval;
@@ -327,6 +335,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
 
     if (this.stateTimer <= 0) {
       this.dashState = 'dash';
+      this.scene.events.emit('chaser-dash', this);
       this.stateTimer = this.role.dash.duration;
     }
   }

@@ -12,11 +12,19 @@ class GameScene extends Phaser.Scene {
   // init вызывается при каждом (пере)запуске сцены — сбрасываем состояние
   init() {
     this.elapsed = 0;            // время выживания в секундах
+    this.scoredTime = 0;         // время, за которое начисляются очки (без пряток в кабинете)
+    this.extraPoints = 0;        // очки за таблетки, комбо, «вплотную», задания
     this.score = 0;
-    this.bonusesCollected = 0;
     this.lastHudSecond = -1;
     this.isGameOver = false;
     this.hasMoved = false;       // двигался ли игрок (для подсказки)
+
+    // Комбо: таблетки подряд быстрее CONFIG.COMBO.WINDOW
+    this.combo = 0;
+    this.lastPillTime = -999;
+
+    // Статистика партии (для заданий и «диагноза»)
+    this.stats = { pills: 0, specialPills: 0, nearMisses: 0, maxCombo: 0, dodges: 0, dashDodges: 0, hides: 0 };
   }
 
   create() {
@@ -41,6 +49,10 @@ class GameScene extends Phaser.Scene {
     // Фиксированный джойстик в нижней панели (js/utils/joystick.js)
     Joystick.setEnabled(true);
 
+    // Звуки рывков пациентов (громче, если рядом)
+    this.events.on('chaser-telegraph', this.onChaserTelegraph, this);
+    this.events.on('chaser-dash', this.onChaserDash, this);
+
     // Пауза/продолжение (их вызывает UIScene)
     this.events.on('pause', this.onScenePause, this);
     this.events.on('resume', this.onSceneResume, this);
@@ -60,6 +72,7 @@ class GameScene extends Phaser.Scene {
     // Ограничиваем шаг, чтобы после подвисания враги не «прыгали»
     const dt = Math.min(delta, 100) / 1000;
     this.elapsed += dt;
+    this.scoredTime += dt;
 
     const difficulty = this.getDifficulty(this.elapsed);
     const input = this.getMoveInput();
@@ -76,6 +89,8 @@ class GameScene extends Phaser.Scene {
       speedMultiplier: difficulty.speedMultiplier,
       turnProgress: difficulty.turnProgress,
       dashInterval: difficulty.dashInterval,
+      // Рывок — только если пациента видно на экране (без прыжков из-за края)
+      view: this.cameras.main.worldView,
       // Рывок одновременно делает только один враг — так честнее и предсказуемее
       dashBusy: this.chasers.some((chaser) => chaser.isDashBusy())
     };
@@ -85,6 +100,8 @@ class GameScene extends Phaser.Scene {
     });
 
     this.updateBonusLifetime(dt, difficulty.phase);
+    this.updateNearMisses(dt);
+    this.updateComboHud();
     this.updateScore();
     this.updateIndicators();
   }
@@ -179,12 +196,37 @@ class GameScene extends Phaser.Scene {
 
   createPlayer() {
     this.player = new Player(this, CONFIG.PLAYER.START.x, CONFIG.PLAYER.START.y);
+    // Шаги героини: звук, когда нога касается пола (кадры «полёта» 3 и 5 листа)
+    this.player.on('animationupdate', (anim, frame) => {
+      if (anim.key.endsWith('run') && (frame.index === 2 || frame.index === 4)) {
+        Sound.play('step');
+      }
+    });
   }
 
   createChasers() {
     // Обычный массив: Phaser-коллайдеры умеют работать с массивами
     // Три врага с разными ролями: Охотник, Перехватчик, Тяжёлый загонщик
-    this.chasers = CONFIG.CHASER.ROLES.map((role) => new Chaser(this, role));
+    this.chasers = CONFIG.CHASER.ROLES.map((role) => this.addChaser(role, role.start.x, role.start.y));
+  }
+
+  // Новый пациент: звуки его рывков и тяжёлых шагов
+  addChaser(role, x, y) {
+    const chaser = new Chaser(this, role, x, y);
+    if (role.key === 'heavy') {
+      chaser.on('animationupdate', (anim, frame) => {
+        if (anim.key.endsWith('run') && (frame.index === 2 || frame.index === 4)) {
+          Sound.play('thud', { volume: this.soundVolumeAt(chaser.x, chaser.y) });
+        }
+      });
+    }
+    return chaser;
+  }
+
+  // Громкость звука в точке мира: рядом — 1, дальше 700 px — тишина
+  soundVolumeAt(x, y) {
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y);
+    return Phaser.Math.Clamp(1 - distance / 700, 0, 1);
   }
 
   createBonus() {
@@ -439,15 +481,91 @@ class GameScene extends Phaser.Scene {
     if (!bonus.active || this.isGameOver) {
       return;
     }
+    const x = bonus.x;
+    const y = bonus.y;
     bonus.hide();
-    this.bonusesCollected += 1;
+
+    // Комбо: успела за окно — множитель растёт, иначе начинается заново
+    const C = CONFIG.COMBO;
+    this.combo = this.elapsed - this.lastPillTime <= C.WINDOW ? Math.min(this.combo + 1, C.MAX) : 1;
+    this.lastPillTime = this.elapsed;
+    this.stats.pills += 1;
+    this.stats.maxCombo = Math.max(this.stats.maxCombo, this.combo);
+
+    const points = CONFIG.BONUS.POINTS * this.combo;
+    this.addPoints(points, x, y, '+' + points + (this.combo > 1 ? '  ×' + this.combo : ''), CONFIG.COLORS.BONUS);
+    Sound.play(this.combo > 1 ? 'combo' : 'pill', { level: this.combo });
+
     this.updateScore();
     this.scheduleBonus(CONFIG.BONUS.RESPAWN_DELAY);
+  }
+
+  // Комбо в панели: множитель и сколько осталось времени окна
+  updateComboHud() {
+    const left = CONFIG.COMBO.WINDOW - (this.elapsed - this.lastPillTime);
+    if (left <= 0 && this.combo > 0) {
+      this.combo = 0;
+    }
+    Hud.setCombo(left > 0 ? this.combo : 0, left / CONFIG.COMBO.WINDOW);
+  }
+
+  // ---------------------------------------------------------------
+  // Очки: добавить и показать всплывающую надпись
+  // ---------------------------------------------------------------
+
+  addPoints(points, x, y, label, color) {
+    this.extraPoints += points;
+    this.popup(x, y, label, color);
+  }
+
+  // Всплывающая надпись в точке мира: поднимается и тает
+  popup(x, y, text, color = CONFIG.COLORS.PAPER) {
+    const label = createText(this, Math.round(x), Math.round(y - 40), text, 30, color, { stroke: 6 }).setDepth(80);
+    this.tweens.add({
+      targets: label,
+      y: label.y - 50,
+      alpha: 0,
+      duration: 900,
+      ease: 'Cubic.easeOut',
+      onComplete: () => label.destroy()
+    });
+  }
+
+  // «Проскочила вплотную»: пациент был совсем рядом, но не поймал
+  updateNearMisses(dt) {
+    const N = CONFIG.NEAR_MISS;
+    this.chasers.forEach((chaser) => {
+      if (!chaser.active) {
+        return;
+      }
+      chaser.nearMissCooldown = Math.max(0, (chaser.nearMissCooldown || 0) - dt);
+      const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, chaser.x, chaser.y);
+      if (distance < N.DISTANCE) {
+        chaser.nearMissArmed = true;
+      } else if (chaser.nearMissArmed && distance > N.DISTANCE + N.RELEASE) {
+        chaser.nearMissArmed = false;
+        if (chaser.nearMissCooldown <= 0) {
+          chaser.nearMissCooldown = N.COOLDOWN;
+          this.stats.nearMisses += 1;
+          this.addPoints(N.POINTS, this.player.x, this.player.y, 'вплотную! +' + N.POINTS, CONFIG.COLORS.PAPER);
+          Sound.play('nearMiss');
+          Sound.vibrate(15);
+        }
+      }
+    });
   }
 
   // ---------------------------------------------------------------
   // Столкновения с врагами и очки
   // ---------------------------------------------------------------
+
+  onChaserTelegraph(chaser) {
+    Sound.play('telegraph', { volume: Math.max(0.4, this.soundVolumeAt(chaser.x, chaser.y)) });
+  }
+
+  onChaserDash(chaser) {
+    Sound.play('dash', { volume: Math.max(0.4, this.soundVolumeAt(chaser.x, chaser.y)) });
+  }
 
   onChaserHitObstacle(chaser, obstacle) {
     chaser.startSliding(obstacle.getBounds());
@@ -465,6 +583,8 @@ class GameScene extends Phaser.Scene {
     this.player.stop();
     this.player.setTintFill(0xffffff);
     this.chasers.forEach((chaser) => chaser.anims.pause()); // все замирают в момент поимки
+    Sound.play('caught');
+    Sound.vibrate([60, 40, 120]);
     Joystick.setActive(false); // палец больше не управляет персонажем
 
     this.events.emit('player-caught');
@@ -479,15 +599,15 @@ class GameScene extends Phaser.Scene {
       score: this.score,
       seconds: this.elapsed,
       isNewRecord: isNewRecord,
-      bestScore: getBestScore()
+      bestScore: getBestScore(),
+      stats: this.stats
     });
   }
 
-  // +10 за каждую полную секунду и +100 за каждый бонус
+  // +10 за каждую полную секунду (кроме пряток) и накопленные очки за таблетки, комбо и т.д.
   updateScore() {
     const seconds = Math.floor(this.elapsed);
-    const newScore = seconds * CONFIG.SCORE.POINTS_PER_SECOND +
-      this.bonusesCollected * CONFIG.BONUS.POINTS;
+    const newScore = Math.floor(this.scoredTime) * CONFIG.SCORE.POINTS_PER_SECOND + this.extraPoints;
 
     // Сообщаем интерфейсу, только если что-то изменилось
     if (newScore !== this.score || seconds !== this.lastHudSecond) {
@@ -517,7 +637,10 @@ class GameScene extends Phaser.Scene {
     // События сцены живут между перезапусками — снимаем свои подписки
     this.events.off('pause', this.onScenePause, this);
     this.events.off('resume', this.onSceneResume, this);
+    this.events.off('chaser-telegraph', this.onChaserTelegraph, this);
+    this.events.off('chaser-dash', this.onChaserDash, this);
     this.scale.off('resize', this.onResize, this);
+    Hud.setCombo(0, 0);
     // Уходим из игры (меню или рестарт) — джойстик прячется и сбрасывается
     Joystick.setEnabled(false);
   }

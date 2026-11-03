@@ -61,5 +61,19 @@ const Hud = {
   update(score, seconds) {
     this.scoreElement.textContent = String(score);
     this.timeElement.textContent = formatTime(seconds);
+  },
+
+  // Комбо: множитель и доля оставшегося окна (1 → 0). multiplier < 2 — скрыть
+  setCombo(multiplier, fraction) {
+    const box = document.getElementById('hud-combo');
+    if (multiplier < 2) {
+      box.classList.remove('is-active');
+      return;
+    }
+    box.classList.add('is-active');
+    document.getElementById('hud-combo-text').textContent = '×' + multiplier;
+    // Полоска убывает ступеньками по 10% — по-пиксельному
+    const steps = Math.ceil(Math.max(0, Math.min(1, fraction)) * 10) * 10;
+    document.getElementById('hud-combo-bar').style.width = steps + '%';
   }
 };

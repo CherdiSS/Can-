@@ -69,6 +69,7 @@ const CONFIG = {
 
     // Рывок (Dash) — общие ограничения
     DASH_MIN_RANGE: 110,    // ближе — не рвётся (и так рядом)
+    DASH_VISIBLE_MARGIN: 40, // рвётся, только если виден на экране (отступ от края)
     DASH_MAX_RANGE: 420,    // дальше — не рвётся (рывок бы не долетел)
     DASH_ACCELERATION: 30,  // разгон до скорости рывка (не мгновенно)
 
@@ -187,6 +188,26 @@ const CONFIG = {
   },
 
   CATCH_DELAY: 400, // мс между поимкой и экраном поражения
+
+  // Комбо: таблетки подряд быстрее WINDOW секунд — множитель очков растёт до MAX
+  COMBO: {
+    WINDOW: 6,
+    MAX: 4
+  },
+
+  // «Проскочила вплотную»: пациент был ближе DISTANCE (центр к центру), но не поймал
+  NEAR_MISS: {
+    DISTANCE: 80,
+    RELEASE: 30,     // засчитывается, когда пациент отдалился ещё на столько
+    POINTS: 25,
+    COOLDOWN: 2      // сек — не чаще для одного пациента
+  },
+
+  // Отсчёт 3-2-1 после паузы
+  COUNTDOWN: {
+    FROM: 3,
+    STEP_MS: 550
+  },
 
   // Анимации персонажей: лист 12 кадров 64×64 в ряд (assets/sprites/make_sprites.py)
   ANIMATION: {
@@ -350,6 +371,7 @@ function createButton(scene, x, y, label, onClick, options = {}) {
   button.on('pointerup', () => {
     draw(false);
     button.label.setY(button.y - 4);
+    Sound.play('click');
     onClick();
   });
 

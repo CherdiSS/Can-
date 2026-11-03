@@ -205,6 +205,29 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Комбо ×2…×4 и полоска оставшегося окна */
+#hud-combo {
+  display: none;
+  margin-top: 2px;
+  width: 100%;
+  text-align: center;
+}
+
+#hud-combo.is-active {
+  display: block;
+}
+
+#hud-combo-text {
+  color: #b03034;
+  font-size: 16px;
+}
+
+#hud-combo-bar {
+  height: 4px;
+  margin: 1px auto 0;
+  background: #b03034;
+}
+
 /* Кнопка паузы: 56×56 — не меньше минимального размера для пальца */
 #pause-button {
   width: 56px;

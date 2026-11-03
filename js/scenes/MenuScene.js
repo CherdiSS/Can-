@@ -6,8 +6,8 @@
 // =============================================================
 
 // Вертикальный центр и высота содержимого меню (в координатах вёрстки)
-const MENU_CENTER_Y = 668;
-const MENU_BLOCK_HEIGHT = 1100;
+const MENU_CENTER_Y = 712;
+const MENU_BLOCK_HEIGHT = 1180;
 const MENU_PIXEL_SCALE = 2; // пиксель-арт в меню — ровно ×2
 
 class MenuScene extends Phaser.Scene {
@@ -28,12 +28,19 @@ class MenuScene extends Phaser.Scene {
     this.createMemo(centerX);
 
     // Главная кнопка — зелёная, как масляная панель стены
-    createButton(this, centerX, 1060, 'ИГРАТЬ', () => this.startGame(), {
+    createButton(this, centerX, 1045, 'ИГРАТЬ', () => this.startGame(), {
       width: 480,
       height: 150,
       fontSize: 64,
       primary: true
     });
+
+    // Звук вкл/выкл (настройка запоминается)
+    this.soundButton = createButton(this, centerX, 1180, '', () => {
+      Sound.setMuted(!Sound.muted);
+      this.updateSoundLabel();
+    }, { width: 300, height: 96, fontSize: 34 });
+    this.updateSoundLabel();
 
     this.createHomeScreenHint(centerX);
 
@@ -96,6 +103,10 @@ class MenuScene extends Phaser.Scene {
     createText(this, centerX, 893, 'Рекорд: ' + getBestScore(), 42, C.STAMP);
   }
 
+  updateSoundLabel() {
+    this.soundButton.label.setText(Sound.muted ? 'ЗВУК: ВЫКЛ' : 'ЗВУК: ВКЛ');
+  }
+
   layout() {
     const height = this.scale.height;
     this.cameras.main.setSize(CONFIG.WIDTH, height);
@@ -110,7 +121,7 @@ class MenuScene extends Phaser.Scene {
     const isStandalone = window.navigator.standalone === true ||
       window.matchMedia('(display-mode: standalone)').matches;
     if (isIos && !isStandalone) {
-      createText(this, centerX, 1188, 'На весь экран: «Поделиться» → «На экран „Домой“»', 24, CONFIG.COLORS.PAPER)
+      createText(this, centerX, 1275, 'На весь экран: «Поделиться» → «На экран „Домой“»', 24, CONFIG.COLORS.PAPER)
         .setBackgroundColor(colorToCss(CONFIG.COLORS.INK)).setPadding(14, 6, 14, 8);
     }
   }

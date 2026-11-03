@@ -61,6 +61,7 @@ function fitGameToScreen() {
 // Сначала размечаем нижнюю панель — чтобы контейнер игры уже имел итоговый размер
 Joystick.init();
 Hud.init();
+Sound.init();
 gameConfig.height = computeGameHeight();
 
 const game = new Phaser.Game(gameConfig);
