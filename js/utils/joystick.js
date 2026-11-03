@@ -18,7 +18,7 @@ const Joystick = {
   enabled: false,    // джойстик показан (идёт игровая сцена)
   active: false,     // джойстик принимает ввод (не пауза и не поражение)
   center: null,      // { cx, cy, r } базы в CSS-пикселях
-  game: null,        // ссылка на Phaser.Game — чтобы пересчитать масштаб после смены размеров
+  onLayoutChange: null, // вызывается после изменения размеров панели (подгонка игры, main.js)
 
   panel: null,
   base: null,
@@ -76,9 +76,9 @@ const Joystick = {
       this.center = this.measureBase();
     }
 
-    // Контейнер игры поменял размер — сразу пересчитываем масштаб canvas
-    if (this.game) {
-      requestAnimationFrame(() => this.game.scale.refresh());
+    // Контейнер игры поменял размер — подгоняем игру (функцию задаёт main.js)
+    if (this.onLayoutChange) {
+      requestAnimationFrame(this.onLayoutChange);
     }
   },
 

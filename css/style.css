@@ -53,9 +53,12 @@ body {
   height: calc(var(--panel-h) + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px); /* джойстик выше полоски жестов iPhone */
   box-sizing: border-box;
-  display: flex;
+  /* три колонки: счёт и таймер | джойстик | пауза — джойстик всегда точно по центру */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: center;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   background: #080a18;
   border-top: 2px solid rgba(60, 240, 255, 0.35);
   touch-action: none;
@@ -100,6 +103,74 @@ body {
   background: rgba(60, 240, 255, 0.6);
   pointer-events: none;
   will-change: transform;
+}
+
+/* ---------- Счёт, таймер и пауза в нижней панели ---------- */
+.hud {
+  visibility: hidden; /* в меню не показываем */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#control-panel.is-game .hud {
+  visibility: visible;
+}
+
+#hud-score {
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: bold;
+  line-height: 1.1;
+}
+
+#hud-score::before {
+  content: "Счёт";
+  display: block;
+  color: #8a93b8;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+}
+
+#hud-time {
+  margin-top: 6px;
+  color: #3cf0ff;
+  font-size: 22px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Кнопка паузы: 56×56 — не меньше минимального размера для пальца */
+#pause-button {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+#pause-button span {
+  width: 7px;
+  height: 22px;
+  background: #ffffff;
+}
+
+#pause-button:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Пауза или поражение — кнопка приглушена */
+#control-panel.is-inactive #pause-button {
+  opacity: 0.4;
 }
 
 #game-container canvas {

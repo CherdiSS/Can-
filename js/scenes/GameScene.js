@@ -33,6 +33,10 @@ class GameScene extends Phaser.Scene {
     this.setupCollisions();
     this.setupKeyboard();
     this.createStartHint();
+    this.createIndicators();
+
+    // Высота экрана игры меняется (поворот, панели браузера) — подгоняем камеру
+    this.scale.on('resize', this.onResize, this);
 
     // Фиксированный джойстик в нижней панели (js/utils/joystick.js)
     Joystick.setEnabled(true);
@@ -82,6 +86,7 @@ class GameScene extends Phaser.Scene {
 
     this.updateBonusLifetime(dt, difficulty.phase);
     this.updateScore();
+    this.updateIndicators();
   }
 
   // ---------------------------------------------------------------
@@ -114,12 +119,17 @@ class GameScene extends Phaser.Scene {
       .setOrigin(0).setDepth(2);
   }
 
-  // Камера показывает часть поля под HUD и следует за игроком, не выходя за края поля
+  // Камера занимает весь экран игры и следует за игроком, не выходя за края поля
   setupCamera() {
     const camera = this.cameras.main;
-    camera.setViewport(0, CONFIG.VIEW_TOP, CONFIG.WIDTH, CONFIG.VIEW_HEIGHT);
+    camera.setViewport(0, 0, CONFIG.WIDTH, this.scale.height);
     camera.setBounds(0, 0, CONFIG.ARENA.WIDTH, CONFIG.ARENA.HEIGHT);
     camera.startFollow(this.player, true, 0.15, 0.15);
+  }
+
+  onResize() {
+    this.cameras.main.setSize(CONFIG.WIDTH, this.scale.height);
+    this.startHint.setY(this.getStartHintY());
   }
 
   createObstacles() {
@@ -213,15 +223,91 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // Над игроком в начале игры (координаты экрана, не мира)
+  getStartHintY() {
+    return this.scale.height - 300;
+  }
+
   createStartHint() {
     this.startHint = createText(
       this,
       CONFIG.WIDTH / 2,
-      870, // координаты окна камеры (не мира): над игроком в начале игры
+      this.getStartHintY(),
       'Управляй джойстиком внизу экрана',
       32,
       CONFIG.COLORS.TEXT_DIM
-    ).setAlpha(0.8).setDepth(50).setScrollFactor(0); // не уезжает вместе с камерой
+    ).setBackgroundColor('#05060fcc').setPadding(18, 8, 18, 8) // тёмная плашка — читается на любом полу
+      .setDepth(50).setScrollFactor(0); // не уезжает вместе с камерой
+  }
+
+  // ---------------------------------------------------------------
+  // Стрелки у краёв экрана: где враги и таблетка, если их не видно
+  // ---------------------------------------------------------------
+
+  createIndicators() {
+    // Рисуются в координатах экрана (не уезжают с камерой), поверх арены
+    this.indicators = this.add.graphics().setScrollFactor(0).setDepth(90);
+  }
+
+  updateIndicators() {
+    const graphics = this.indicators;
+    graphics.clear();
+
+    this.chasers.forEach((chaser) => {
+      // Враг готовит рывок — стрелка белая, как и он сам
+      const color = chaser.dashState === 'telegraph' ? 0xffffff : chaser.role.color;
+      this.drawIndicator(graphics, chaser.x, chaser.y, color);
+    });
+    if (this.bonus.active) {
+      this.drawIndicator(graphics, this.bonus.x, this.bonus.y, CONFIG.INDICATORS.BONUS_COLOR);
+    }
+  }
+
+  // Стрелка на краю экрана в направлении цели (только если цели не видно)
+  drawIndicator(graphics, targetX, targetY, color) {
+    const I = CONFIG.INDICATORS;
+    const camera = this.cameras.main;
+    const view = camera.worldView;
+    if (view.contains(targetX, targetY)) {
+      return;
+    }
+
+    // Направление из центра экрана на цель
+    const halfW = camera.width / 2;
+    const halfH = camera.height / 2;
+    const dx = targetX - view.centerX;
+    const dy = targetY - view.centerY;
+    // Точка, где этот луч пересекает рамку с отступом MARGIN от краёв экрана
+    const k = Math.min(
+      dx !== 0 ? (halfW - I.MARGIN) / Math.abs(dx) : Infinity,
+      dy !== 0 ? (halfH - I.MARGIN) / Math.abs(dy) : Infinity
+    );
+    const x = halfW + dx * k;
+    const y = halfH + dy * k;
+
+    // Чем ближе цель к игроку, тем крупнее стрелка
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, targetX, targetY);
+    const t = Phaser.Math.Clamp((distance - I.NEAR_DISTANCE) / (I.FAR_DISTANCE - I.NEAR_DISTANCE), 0, 1);
+    const size = Phaser.Math.Linear(I.SIZE_NEAR, I.SIZE_FAR, t);
+
+    // Треугольник остриём к цели
+    const angle = Math.atan2(dy, dx);
+    const tipX = x + Math.cos(angle) * size;
+    const tipY = y + Math.sin(angle) * size;
+    const backX = x - Math.cos(angle) * size * 0.6;
+    const backY = y - Math.sin(angle) * size * 0.6;
+    const sideX = Math.cos(angle + Math.PI / 2) * size * 0.8;
+    const sideY = Math.sin(angle + Math.PI / 2) * size * 0.8;
+
+    graphics.fillStyle(color, 0.95);
+    graphics.lineStyle(3, 0x05060f, 0.9);
+    graphics.beginPath();
+    graphics.moveTo(tipX, tipY);
+    graphics.lineTo(backX + sideX, backY + sideY);
+    graphics.lineTo(backX - sideX, backY - sideY);
+    graphics.closePath();
+    graphics.fillPath();
+    graphics.strokePath();
   }
 
   // Итоговое направление движения: джойстик важнее клавиатуры
@@ -381,6 +467,7 @@ class GameScene extends Phaser.Scene {
       return;
     }
     this.isGameOver = true;
+    this.startHint.setVisible(false); // не просвечивает сквозь экран поражения
 
     // Замораживаем момент поимки
     this.physics.pause();
@@ -438,6 +525,7 @@ class GameScene extends Phaser.Scene {
     // События сцены живут между перезапусками — снимаем свои подписки
     this.events.off('pause', this.onScenePause, this);
     this.events.off('resume', this.onSceneResume, this);
+    this.scale.off('resize', this.onResize, this);
     // Уходим из игры (меню или рестарт) — джойстик прячется и сбрасывается
     Joystick.setEnabled(false);
   }

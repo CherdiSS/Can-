@@ -1,6 +1,12 @@
 // =============================================================
 // MenuScene — главное меню: название, подсказка, рекорд, кнопка «ИГРАТЬ».
+// Свёрстано в координатах 720×1280; всё лежит в контейнере, который
+// центрируется и уменьшается, если экран игры ниже расчётного.
 // =============================================================
+
+// Вертикальный центр и высота содержимого меню (в координатах вёрстки)
+const MENU_CENTER_Y = 680;
+const MENU_BLOCK_HEIGHT = 1080;
 
 class MenuScene extends Phaser.Scene {
   constructor() {
@@ -22,6 +28,19 @@ class MenuScene extends Phaser.Scene {
       height: 150,
       fontSize: 60
     });
+
+    this.createHomeScreenHint(centerX);
+
+    // Собираем всё в контейнер: координаты — относительно центра содержимого
+    const items = this.children.list.slice();
+    items.forEach((item) => {
+      item.x -= centerX;
+      item.y -= MENU_CENTER_Y;
+    });
+    this.content = this.add.container(0, 0, items);
+    this.layout();
+    this.scale.on('resize', this.layout, this);
+    this.events.once('shutdown', () => this.scale.off('resize', this.layout, this));
 
     // На компьютере можно начать игру клавишами Enter или Пробел
     if (this.input.keyboard) {
@@ -61,6 +80,22 @@ class MenuScene extends Phaser.Scene {
 
   createBestScore(centerX) {
     createText(this, centerX, 910, 'Рекорд: ' + getBestScore(), 44, CONFIG.COLORS.BONUS);
+  }
+
+  layout() {
+    this.cameras.main.setSize(CONFIG.WIDTH, this.scale.height);
+    fitContainer(this.content, this.scale.height, MENU_BLOCK_HEIGHT);
+  }
+
+  // На iPhone в Safari подсказываем, как запустить игру на весь экран
+  createHomeScreenHint(centerX) {
+    const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isStandalone = window.navigator.standalone === true ||
+      window.matchMedia('(display-mode: standalone)').matches;
+    if (isIos && !isStandalone) {
+      createText(this, centerX, 1180, 'На весь экран: «Поделиться» → «На экран „Домой“»', 26, CONFIG.COLORS.TEXT_DIM);
+    }
   }
 
   startGame() {

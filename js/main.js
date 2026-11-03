@@ -9,7 +9,8 @@ const gameConfig = {
   height: CONFIG.HEIGHT,
   backgroundColor: colorToCss(CONFIG.COLORS.BACKGROUND),
 
-  // FIT — вписываем поле 9:16 в контейнер (экран минус safe-area и панель управления) без искажений
+  // FIT вписывает canvas в контейнер без искажений. Высоту игры мы сами подбираем
+  // под пропорцию контейнера (computeGameHeight), так что canvas заполняет его целиком
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
@@ -33,11 +34,37 @@ const gameConfig = {
   scene: [BootScene, MenuScene, GameScene, UIScene]
 };
 
-// Сначала размечаем нижнюю панель — чтобы Phaser сразу получил правильный размер контейнера
+// Высота игры по пропорции места под canvas: ширина всегда CONFIG.WIDTH,
+// поэтому canvas занимает всю ширину экрана, без чёрных полос по бокам
+function computeGameHeight() {
+  const container = document.getElementById('game-container');
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  if (!width || !height) {
+    return CONFIG.HEIGHT;
+  }
+  const gameHeight = CONFIG.WIDTH * height / width;
+  return Math.round(Math.min(CONFIG.MAX_HEIGHT, Math.max(CONFIG.MIN_HEIGHT, gameHeight)));
+}
+
+// Поворот экрана, изменение окна, появление/скрытие панелей браузера —
+// подгоняем высоту игры; сцены получают событие 'resize' и перестраиваются
+function fitGameToScreen() {
+  const height = computeGameHeight();
+  if (height !== game.scale.height) {
+    game.scale.setGameSize(CONFIG.WIDTH, height);
+  } else {
+    game.scale.refresh();
+  }
+}
+
+// Сначала размечаем нижнюю панель — чтобы контейнер игры уже имел итоговый размер
 Joystick.init();
+Hud.init();
+gameConfig.height = computeGameHeight();
 
 const game = new Phaser.Game(gameConfig);
-Joystick.game = game; // для пересчёта масштаба при изменении размера окна
+Joystick.onLayoutChange = fitGameToScreen;
 
 // Запрещаем браузерные жесты: прокрутку, pinch-to-zoom (iOS), двойной тап и меню
 function blockBrowserGestures() {

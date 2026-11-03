@@ -1,8 +1,14 @@
 // =============================================================
-// UIScene — интерфейс поверх GameScene:
-// HUD (счёт, таймер, пауза), экран паузы и экран поражения.
+// UIScene — интерфейс поверх GameScene: экран паузы и экран поражения.
+// Счёт, таймер и кнопка паузы — в нижней HTML-панели (js/utils/hud.js).
+// Высота экрана игры меняется (под пропорцию телефона), поэтому содержимое
+// оверлеев лежит в контейнерах: они центрируются и при нехватке места уменьшаются.
 // Состояния: 'playing' → 'paused' / 'caught' → 'gameover'.
 // =============================================================
+
+// Высота блоков оверлеев (их координаты — относительно центра экрана)
+const PAUSE_BLOCK_HEIGHT = 480;
+const GAME_OVER_BLOCK_HEIGHT = 800;
 
 class UIScene extends Phaser.Scene {
   constructor() {
@@ -13,12 +19,15 @@ class UIScene extends Phaser.Scene {
     this.gameScene = this.scene.get('GameScene');
     this.state = 'playing';
 
-    this.createHud();
     this.createPauseOverlay();
     this.createGameOverOverlay();
+    this.layout();
 
     setItemsVisible(this.pauseItems, false);
     setItemsVisible(this.gameOverItems, false);
+
+    // Кнопка паузы в нижней панели
+    Hud.onPause = () => this.pauseGame();
 
     // Начальные значения HUD
     this.updateHud(this.gameScene.score, this.gameScene.elapsed);
@@ -32,6 +41,9 @@ class UIScene extends Phaser.Scene {
     this.game.events.on(Phaser.Core.Events.BLUR, this.onFocusLost, this);
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.onFocusLost, this);
 
+    // Изменился размер экрана — перестраиваем оверлеи
+    this.scale.on('resize', this.layout, this);
+
     // На компьютере пауза — Esc или P
     if (this.input.keyboard) {
       this.input.keyboard.on('keydown-ESC', this.togglePause, this);
@@ -41,49 +53,23 @@ class UIScene extends Phaser.Scene {
     this.events.once('shutdown', this.onShutdown, this);
   }
 
-  // ---------------------------------------------------------------
-  // HUD
-  // ---------------------------------------------------------------
-
-  createHud() {
-    const centerY = CONFIG.HUD_HEIGHT / 2;
-
-    this.add.rectangle(CONFIG.WIDTH / 2, centerY, CONFIG.WIDTH, CONFIG.HUD_HEIGHT, CONFIG.COLORS.HUD);
-    this.add.rectangle(CONFIG.WIDTH / 2, CONFIG.HUD_HEIGHT - 1.5, CONFIG.WIDTH, 3, CONFIG.COLORS.PLAYER, 0.5);
-
-    // Счёт — слева
-    this.scoreText = createText(this, 28, centerY, '', 40).setOrigin(0, 0.5);
-
-    // Таймер — по центру
-    this.timeText = createText(this, CONFIG.WIDTH / 2, centerY, '', 48, CONFIG.COLORS.PLAYER);
-
-    this.createPauseButton(centerY);
-  }
-
-  // Кнопка паузы: квадрат с двумя вертикальными полосками
-  createPauseButton(centerY) {
-    const size = CONFIG.UI.BUTTON_MIN_SIZE;
-    const x = CONFIG.WIDTH - 20 - size / 2;
-    const color = CONFIG.COLORS.TEXT;
-
-    this.pauseButton = this.add.rectangle(x, centerY, size, size, color, 0.08)
-      .setStrokeStyle(4, color, 0.8)
-      .setInteractive({ useHandCursor: true });
-
-    this.add.rectangle(x - 13, centerY, 12, 42, color);
-    this.add.rectangle(x + 13, centerY, 12, 42, color);
-
-    this.pauseButton.on('pointerdown', () => this.pauseButton.setFillStyle(color, 0.3));
-    this.pauseButton.on('pointerout', () => this.pauseButton.setFillStyle(color, 0.08));
-    this.pauseButton.on('pointerup', () => {
-      this.pauseButton.setFillStyle(color, 0.08);
-      this.pauseGame();
-    });
+  // Подгонка под текущую высоту экрана игры
+  layout() {
+    const height = this.scale.height;
+    this.cameras.main.setSize(CONFIG.WIDTH, height);
+    fitContainer(this.pauseContent, height, PAUSE_BLOCK_HEIGHT);
+    fitContainer(this.gameOverContent, height, GAME_OVER_BLOCK_HEIGHT);
   }
 
   updateHud(score, seconds) {
-    this.scoreText.setText('Счёт: ' + score);
-    this.timeText.setText(formatTime(seconds));
+    Hud.update(score, seconds);
+  }
+
+  // Затемнение с запасом по высоте — закрывает экран при любой его высоте
+  // и перехватывает нажатия, чтобы они не доходили до игры
+  createShade(alpha) {
+    return this.add.rectangle(CONFIG.WIDTH / 2, 0, CONFIG.WIDTH, CONFIG.MAX_HEIGHT * 2, 0x000000, alpha)
+      .setInteractive();
   }
 
   // ---------------------------------------------------------------
@@ -91,19 +77,16 @@ class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   createPauseOverlay() {
-    const centerX = CONFIG.WIDTH / 2;
+    const shade = this.createShade(0.65);
 
-    // Затемнение перехватывает нажатия, чтобы они не доходили до HUD
-    const shade = this.add.rectangle(centerX, CONFIG.HEIGHT / 2, CONFIG.WIDTH, CONFIG.HEIGHT, 0x000000, 0.65)
-      .setInteractive();
-
-    const title = createText(this, centerX, 470, 'ПАУЗА', 88, CONFIG.COLORS.PLAYER);
-
-    const resumeButton = createButton(this, centerX, 660, 'ПРОДОЛЖИТЬ', () => this.resumeGame());
-    const menuButton = createButton(this, centerX, 830, 'В МЕНЮ', () => this.goToMenu(), {
+    // Координаты — относительно центра экрана (контейнер ставится в центр)
+    const title = createText(this, 0, -190, 'ПАУЗА', 88, CONFIG.COLORS.PLAYER);
+    const resumeButton = createButton(this, 0, 0, 'ПРОДОЛЖИТЬ', () => this.resumeGame());
+    const menuButton = createButton(this, 0, 170, 'В МЕНЮ', () => this.goToMenu(), {
       color: CONFIG.COLORS.TEXT_DIM
     });
 
+    this.pauseContent = this.add.container(0, 0, [title, resumeButton, resumeButton.label, menuButton, menuButton.label]);
     this.pauseItems = [shade, title, resumeButton, menuButton];
   }
 
@@ -142,30 +125,31 @@ class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   createGameOverOverlay() {
-    const centerX = CONFIG.WIDTH / 2;
+    const shade = this.createShade(0.85);
 
-    const shade = this.add.rectangle(centerX, CONFIG.HEIGHT / 2, CONFIG.WIDTH, CONFIG.HEIGHT, 0x000000, 0.85)
-      .setInteractive();
+    const title = createText(this, 0, -350, 'ПОЙМАН!', 92, CONFIG.COLORS.CHASER);
+    const scoreLabel = createText(this, 0, -230, 'Счёт', 36, CONFIG.COLORS.TEXT_DIM);
+    this.finalScoreText = createText(this, 0, -160, '0', 104);
+    this.finalTimeText = createText(this, 0, -60, '', 44, CONFIG.COLORS.PLAYER);
+    this.newRecordText = createText(this, 0, 15, 'Новый рекорд!', 52, CONFIG.COLORS.BONUS);
+    this.bestScoreText = createText(this, 0, 80, '', 34, CONFIG.COLORS.TEXT_DIM);
 
-    const title = createText(this, centerX, 300, 'ПОЙМАН!', 92, CONFIG.COLORS.CHASER);
-    const scoreLabel = createText(this, centerX, 440, 'Счёт', 36, CONFIG.COLORS.TEXT_DIM);
-    this.finalScoreText = createText(this, centerX, 515, '0', 104);
-    this.finalTimeText = createText(this, centerX, 620, '', 44, CONFIG.COLORS.PLAYER);
-    this.newRecordText = createText(this, centerX, 700, 'Новый рекорд!', 52, CONFIG.COLORS.BONUS);
-    this.bestScoreText = createText(this, centerX, 770, '', 34, CONFIG.COLORS.TEXT_DIM);
-
-    const restartButton = createButton(this, centerX, 930, 'ИГРАТЬ СНОВА', () => this.restartGame(), {
+    const restartButton = createButton(this, 0, 210, 'ИГРАТЬ СНОВА', () => this.restartGame(), {
       width: 480,
       height: 140,
       fontSize: 52
     });
-    const menuButton = createButton(this, centerX, 1100, 'В МЕНЮ', () => this.goToMenu(), {
+    const menuButton = createButton(this, 0, 345, 'В МЕНЮ', () => this.goToMenu(), {
       width: 380,
-      height: 120,
+      height: 110,
       fontSize: 44,
       color: CONFIG.COLORS.TEXT_DIM
     });
 
+    this.gameOverContent = this.add.container(0, 0, [
+      title, scoreLabel, this.finalScoreText, this.finalTimeText, this.newRecordText, this.bestScoreText,
+      restartButton, restartButton.label, menuButton, menuButton.label
+    ]);
     this.gameOverItems = [
       shade, title, scoreLabel, this.finalScoreText, this.finalTimeText,
       this.newRecordText, this.bestScoreText, restartButton, menuButton
@@ -206,6 +190,8 @@ class UIScene extends Phaser.Scene {
   }
 
   onShutdown() {
+    Hud.onPause = null;
+    this.scale.off('resize', this.layout, this);
     this.gameScene.events.off('hud-update', this.updateHud, this);
     this.gameScene.events.off('player-caught', this.onPlayerCaught, this);
     this.gameScene.events.off('game-over', this.showGameOver, this);

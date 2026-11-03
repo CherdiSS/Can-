@@ -1,0 +1,42 @@
+# Иконки «Неонового Побега» для экрана «Домой» (iPhone) и манифеста (Android).
+# Собираются из готовых пиксельных спрайтов увеличением без сглаживания.
+# Перегенерировать: python3 assets/icons/make_icons.py  (нужен Pillow)
+import os
+from PIL import Image, ImageDraw
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SPRITES = os.path.join(HERE, '..', 'sprites')
+BG = (5, 6, 15, 255)           # фон игры
+NEON = (60, 240, 255, 255)     # цвет игрока
+RED = (255, 59, 92, 255)       # цвет Охотника
+
+doctor = Image.open(os.path.join(SPRITES, 'doctor.png')).convert('RGBA')
+hunter = Image.open(os.path.join(SPRITES, 'enemy_hunter.png')).convert('RGBA')
+
+
+def make_icon(size):
+    unit = size / 180                       # всё рассчитано для 180×180
+    icon = Image.new('RGBA', (size, size), BG)
+    draw = ImageDraw.Draw(icon)
+    # Неоновая рамка
+    border = max(2, round(6 * unit))
+    draw.rounded_rectangle([border, border, size - 1 - border, size - 1 - border],
+                           radius=round(30 * unit), outline=NEON, width=border)
+    # Врач крупно по центру, охотник поменьше сзади-справа; масштаб — целое число
+    big = max(1, round(2 * unit))
+    small = max(1, round(1 * unit))
+    h = hunter.resize((hunter.width * small, hunter.height * small), Image.NEAREST)
+    d = doctor.resize((doctor.width * big, doctor.height * big), Image.NEAREST)
+    icon.alpha_composite(h, (size - h.width - round(14 * unit), round(18 * unit)))
+    icon.alpha_composite(d, ((size - d.width) // 2 - round(10 * unit), size - d.height - round(16 * unit)))
+    # Кольцо цвета Охотника у его ног
+    cx = size - h.width // 2 - round(14 * unit)
+    cy = round(18 * unit) + h.height - round(6 * unit)
+    rx, ry = round(20 * unit), round(6 * unit)
+    draw.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], outline=RED, width=max(1, round(2 * unit)))
+    return icon.convert('RGB')               # iOS не любит прозрачность в иконках
+
+
+for size in (180, 192, 512):
+    make_icon(size).save(os.path.join(HERE, 'icon-%d.png' % size))
+print('ok')
