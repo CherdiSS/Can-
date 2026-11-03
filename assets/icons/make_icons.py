@@ -6,8 +6,9 @@ from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SPRITES = os.path.join(HERE, '..', 'sprites')
-BG = (5, 6, 15, 255)           # фон игры
-NEON = (60, 240, 255, 255)     # цвет игрока
+# Палитра поликлиники (как у окружения и интерфейса)
+BG = (122, 164, 140, 255)      # масляная панель стены
+NEON = (30, 36, 44, 255)       # тёмный контур — рамка иконки
 RED = (255, 59, 92, 255)       # цвет Охотника
 
 doctor = Image.open(os.path.join(SPRITES, 'doctor.png')).convert('RGBA')
@@ -21,7 +22,7 @@ def make_icon(size):
     # Неоновая рамка
     border = max(2, round(6 * unit))
     draw.rounded_rectangle([border, border, size - 1 - border, size - 1 - border],
-                           radius=round(30 * unit), outline=NEON, width=border)
+                           radius=round(10 * unit), outline=NEON, width=border)
     # Врач крупно по центру, охотник поменьше сзади-справа; масштаб — целое число
     big = max(1, round(2 * unit))
     small = max(1, round(1 * unit))

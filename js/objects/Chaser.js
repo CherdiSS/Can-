@@ -47,6 +47,8 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
 
     // Кольцо цвета роли, шлейф и подсказки рывка рисуем в своей графике под врагом
     this.fx = scene.add.graphics().setDepth(8);
+    // Пиксельное кольцо цвета роли у ног (assets/ui/ring.png) — по нему различаются враги
+    this.ring = scene.add.image(role.start.x, role.start.y + CONFIG.CHASER.RING.OFFSET_Y, 'ui-ring').setTint(role.color).setDepth(7);
     this.trail = [];
     this.trailTimer = 0;
   }
@@ -407,32 +409,42 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     const color = this.role.color;
     const count = this.trail.length;
     const ring = CONFIG.CHASER.RING;
+    const px = CONFIG.CHASER.FX_PIXEL; // размер «пикселя» эффектов
     g.clear();
 
-    // Неоновое кольцо цвета роли у ног — по нему различаются три врага
-    g.fillStyle(color, 0.18);
-    g.fillEllipse(cx, cy + ring.OFFSET_Y, ring.WIDTH, ring.HEIGHT);
-    g.lineStyle(4, color, 0.95);
-    g.strokeEllipse(cx, cy + ring.OFFSET_Y, ring.WIDTH, ring.HEIGHT);
+    // Кольцо у ног — пиксельная картинка, позиция округлена до целых пикселей
+    this.ring.setPosition(Math.round(cx), Math.round(cy + ring.OFFSET_Y));
 
-    // Сужающийся шлейф: точки всё меньше и прозрачнее
+    // Сужающийся шлейф из квадратных «пикселей», выровненных по сетке
     for (let i = 0; i < count; i++) {
       const fade = 1 - (i + 1) / (count + 1);
-      g.fillStyle(color, 0.35 * fade);
-      g.fillCircle(this.trail[i].x, this.trail[i].y, CONFIG.CHASER.HITBOX_RADIUS * 0.75 * fade);
+      const size = Math.max(px, Math.round(CONFIG.CHASER.HITBOX_RADIUS * 1.2 * fade / px) * px);
+      g.fillStyle(color, 0.45 * fade);
+      g.fillRect(snap(this.trail[i].x - size / 2, px), snap(this.trail[i].y - size / 2, px), size, size);
     }
 
     if (this.dashState === 'telegraph') {
       const progress = 1 - this.stateTimer / this.role.dash.telegraph; // 0 → 1
       const length = this.getDashLength();
 
-      // Линия будущего рывка
-      g.lineStyle(4, color, 0.25 + 0.45 * progress);
-      g.lineBetween(cx, cy, cx + this.dashDirection.x * length, cy + this.dashDirection.y * length);
+      // Линия будущего рывка — пунктир из квадратиков
+      g.fillStyle(color, 0.35 + 0.5 * progress);
+      for (let d = 30; d <= length; d += px * 3) {
+        g.fillRect(snap(cx + this.dashDirection.x * d - px / 2, px), snap(cy + this.dashDirection.y * d - px / 2, px), px * 1.5, px * 1.5);
+      }
 
-      // Расширяющееся кольцо-предупреждение
-      g.lineStyle(4, 0xffffff, 0.8 - 0.4 * progress);
-      g.strokeCircle(cx, cy, this.role.size / 2 + 6 + 18 * progress);
+      // Расширяющееся кольцо-предупреждение — 12 белых квадратиков по окружности
+      const radius = this.role.size / 2 + 6 + 18 * progress;
+      g.fillStyle(0xffffff, 0.9 - 0.4 * progress);
+      for (let i = 0; i < 12; i++) {
+        const a = (Math.PI * 2 * i) / 12;
+        g.fillRect(snap(cx + Math.cos(a) * radius - px, px), snap(cy + Math.sin(a) * radius - px, px), px * 2, px * 2);
+      }
     }
   }
+}
+
+// Округление до сетки «пикселей» эффектов
+function snap(value, px) {
+  return Math.round(value / px) * px;
 }

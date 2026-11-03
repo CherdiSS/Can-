@@ -7,8 +7,8 @@
 // =============================================================
 
 // Высота блоков оверлеев (их координаты — относительно центра экрана)
-const PAUSE_BLOCK_HEIGHT = 480;
-const GAME_OVER_BLOCK_HEIGHT = 800;
+const PAUSE_BLOCK_HEIGHT = 520;
+const GAME_OVER_BLOCK_HEIGHT = 860;
 
 class UIScene extends Phaser.Scene {
   constructor() {
@@ -68,8 +68,15 @@ class UIScene extends Phaser.Scene {
   // Затемнение с запасом по высоте — закрывает экран при любой его высоте
   // и перехватывает нажатия, чтобы они не доходили до игры
   createShade(alpha) {
-    return this.add.rectangle(CONFIG.WIDTH / 2, 0, CONFIG.WIDTH, CONFIG.MAX_HEIGHT * 2, 0x000000, alpha)
+    return this.add.rectangle(CONFIG.WIDTH / 2, 0, CONFIG.WIDTH, CONFIG.MAX_HEIGHT * 2, CONFIG.COLORS.INK, alpha)
       .setInteractive();
+  }
+
+  // Карточка-побелка (как справка или памятка в поликлинике), координаты — от центра
+  createCard(width, height) {
+    const card = this.add.graphics();
+    drawPlate(card, 0, 0, width, height, CONFIG.COLORS.PAPER, CONFIG.COLORS.PAPER_SHADE, 8);
+    return card;
   }
 
   // ---------------------------------------------------------------
@@ -77,17 +84,16 @@ class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   createPauseOverlay() {
-    const shade = this.createShade(0.65);
+    const shade = this.createShade(0.7);
 
     // Координаты — относительно центра экрана (контейнер ставится в центр)
-    const title = createText(this, 0, -190, 'ПАУЗА', 88, CONFIG.COLORS.PLAYER);
-    const resumeButton = createButton(this, 0, 0, 'ПРОДОЛЖИТЬ', () => this.resumeGame());
-    const menuButton = createButton(this, 0, 170, 'В МЕНЮ', () => this.goToMenu(), {
-      color: CONFIG.COLORS.TEXT_DIM
-    });
+    const card = this.createCard(560, 500);
+    const title = createText(this, 0, -165, 'ПАУЗА', 84);
+    const resumeButton = createButton(this, 0, 0, 'ПРОДОЛЖИТЬ', () => this.resumeGame(), { primary: true });
+    const menuButton = createButton(this, 0, 150, 'В МЕНЮ', () => this.goToMenu(), { height: 112, fontSize: 44 });
 
-    this.pauseContent = this.add.container(0, 0, [title, resumeButton, resumeButton.label, menuButton, menuButton.label]);
-    this.pauseItems = [shade, title, resumeButton, menuButton];
+    this.pauseContent = this.add.container(0, 0, [card, title].concat(buttonParts(resumeButton), buttonParts(menuButton)));
+    this.pauseItems = [shade, card, title, resumeButton, menuButton];
   }
 
   pauseGame() {
@@ -125,33 +131,42 @@ class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   createGameOverOverlay() {
-    const shade = this.createShade(0.85);
+    const C = CONFIG.COLORS;
+    const shade = this.createShade(0.8);
+    const card = this.createCard(620, 840);
 
-    const title = createText(this, 0, -350, 'ПОЙМАН!', 92, CONFIG.COLORS.CHASER);
-    const scoreLabel = createText(this, 0, -230, 'Счёт', 36, CONFIG.COLORS.TEXT_DIM);
-    this.finalScoreText = createText(this, 0, -160, '0', 104);
-    this.finalTimeText = createText(this, 0, -60, '', 44, CONFIG.COLORS.PLAYER);
-    this.newRecordText = createText(this, 0, 15, 'Новый рекорд!', 52, CONFIG.COLORS.BONUS);
-    this.bestScoreText = createText(this, 0, 80, '', 34, CONFIG.COLORS.TEXT_DIM);
+    // «ПОЙМАН!» — красный штамп в рамке (без поворота — пиксели остаются ровными)
+    const stamp = this.add.graphics({ x: 0, y: -320 });
+    stamp.fillStyle(C.STAMP, 1);
+    stamp.fillRect(-232, -64, 464, 8);
+    stamp.fillRect(-232, 56, 464, 8);
+    stamp.fillRect(-232, -64, 8, 128);
+    stamp.fillRect(224, -64, 8, 128);
+    const title = createText(this, 0, -324, 'ПОЙМАН!', 88, C.STAMP);
 
-    const restartButton = createButton(this, 0, 210, 'ИГРАТЬ СНОВА', () => this.restartGame(), {
-      width: 480,
+    const scoreLabel = createText(this, 0, -200, 'Счёт', 34, C.PAINT_LINE);
+    this.finalScoreText = createText(this, 0, -138, '0', 100);
+    this.finalTimeText = createText(this, 0, -52, '', 40, C.PAINT_LINE);
+    this.newRecordText = createText(this, 0, 10, 'Новый рекорд!', 48, C.STAMP);
+    this.bestScoreText = createText(this, 0, 66, '', 32, C.PAINT_LINE);
+
+    const restartButton = createButton(this, 0, 195, 'ИГРАТЬ СНОВА', () => this.restartGame(), {
+      width: 500,
       height: 140,
-      fontSize: 52
+      fontSize: 52,
+      primary: true
     });
-    const menuButton = createButton(this, 0, 345, 'В МЕНЮ', () => this.goToMenu(), {
+    const menuButton = createButton(this, 0, 330, 'В МЕНЮ', () => this.goToMenu(), {
       width: 380,
       height: 110,
-      fontSize: 44,
-      color: CONFIG.COLORS.TEXT_DIM
+      fontSize: 44
     });
 
     this.gameOverContent = this.add.container(0, 0, [
-      title, scoreLabel, this.finalScoreText, this.finalTimeText, this.newRecordText, this.bestScoreText,
-      restartButton, restartButton.label, menuButton, menuButton.label
-    ]);
+      card, stamp, title, scoreLabel, this.finalScoreText, this.finalTimeText, this.newRecordText, this.bestScoreText
+    ].concat(buttonParts(restartButton), buttonParts(menuButton)));
     this.gameOverItems = [
-      shade, title, scoreLabel, this.finalScoreText, this.finalTimeText,
+      shade, card, stamp, title, scoreLabel, this.finalScoreText, this.finalTimeText,
       this.newRecordText, this.bestScoreText, restartButton, menuButton
     ];
   }

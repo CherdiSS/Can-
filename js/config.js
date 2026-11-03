@@ -22,20 +22,24 @@ const CONFIG = {
     HEIGHT: 1774
   },
 
-  FONT: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  // Пиксельный шрифт с кириллицей Tiny5 (assets/fonts/, подключён в css/style.css)
+  FONT: '"Tiny5", monospace',
 
+  // Единая палитра «районная поликлиника» — те же цвета, что у пиксельного окружения
   COLORS: {
-    BACKGROUND: 0x05060f,
-    ARENA: 0x0a0d1e,
-    GRID: 0x3cf0ff,
-    HUD: 0x080a18,
-    PLAYER: 0x3cf0ff,   // неоново-голубой
-    CHASER: 0xff3b5c,   // неоново-красный (заголовок «ПОЙМАН!»)
-    BONUS: 0xffe14d,    // жёлтый
-    OBSTACLE_FILL: 0x2a2f45,
-    OBSTACLE_STROKE: 0x8a93b8,
-    TEXT: 0xffffff,
-    TEXT_DIM: 0x8a93b8
+    INK: 0x1e242c,         // тёмный контур, текст на светлом
+    PAPER: 0xd6d6c8,       // побелка: таблички, карточки
+    PAPER_SHADE: 0xb2b4aa, // тень побелки: нижняя грань табличек
+    PAINT: 0x7aa48c,       // масляная панель стены: главные кнопки
+    PAINT_DARK: 0x5c826e,
+    PAINT_LINE: 0x3a4844,  // бордюр панели, приглушённый текст
+    WOOD: 0xa68a68,        // дерево (рамки)
+    WOOD_DARK: 0x745c46,
+    STAMP: 0xb03034,       // красный штамп («ПОЙМАН!»)
+    BACKGROUND: 0x1e242c,
+    PLAYER: 0x3cf0ff,      // контур героини (вшит в спрайт)
+    CHASER: 0xff3b5c,      // контур Охотника (вшит в спрайт)
+    BONUS: 0xffe14d        // таблетка
   },
 
   PLAYER: {
@@ -54,7 +58,8 @@ const CONFIG = {
 
     // У каждой роли свой пиксельный спрайт 64×64 (assets/sprites/), контур — цвета роли.
     // Тень-кольцо цвета роли у ног: смещение от центра спрайта вниз и размеры эллипса
-    RING: { OFFSET_Y: 28, WIDTH: 46, HEIGHT: 14 },
+    RING: { OFFSET_Y: 28, WIDTH: 46, HEIGHT: 14 }, // картинка assets/ui/ring.png (46×14)
+    FX_PIXEL: 4,            // размер «пикселя» шлейфа и подсказок рывка
     SEPARATION_RADIUS: 110, // ближе этого расстояния враги отталкиваются
     SEPARATION_FORCE: 1.5,
     SLIDE_TIME: 0.35,       // сколько секунд враг скользит вдоль препятствия
@@ -178,8 +183,8 @@ const CONFIG = {
   // Стрелки у краёв экрана: где враги и таблетка, если их не видно
   INDICATORS: {
     MARGIN: 34,        // отступ стрелки от края экрана (игровые px)
-    SIZE_NEAR: 30,     // размер стрелки, когда цель близко
-    SIZE_FAR: 18,      // … и когда далеко
+    SCALE_NEAR: 5,     // масштаб пиксельной стрелки 12×12, когда цель близко
+    SCALE_FAR: 3,      // … и когда далеко
     NEAR_DISTANCE: 400,
     FAR_DISTANCE: 1300,
     BONUS_COLOR: 0xffe14d
@@ -255,41 +260,83 @@ function formatTime(seconds) {
   return minutes + ':' + String(secs).padStart(2, '0');
 }
 
-// Создаёт текст с единым стилем
-function createText(scene, x, y, text, size, color = CONFIG.COLORS.TEXT) {
-  return scene.add.text(x, y, text, {
+// Создаёт текст с единым стилем (пиксельный шрифт).
+// options.stroke — тёмная обводка для текста поверх пола/картинок.
+function createText(scene, x, y, text, size, color = CONFIG.COLORS.INK, options = {}) {
+  const label = scene.add.text(x, y, text, {
     fontFamily: CONFIG.FONT,
     fontSize: size + 'px',
-    fontStyle: 'bold',
+    fontStyle: 'normal', // у пиксельного шрифта одно начертание — без искусственного жирного
     color: colorToCss(color),
-    align: 'center'
+    align: 'center',
+    lineSpacing: options.lineSpacing || 0
   }).setOrigin(0.5);
+  if (options.stroke) {
+    label.setStroke(colorToCss(CONFIG.COLORS.INK), options.stroke);
+  }
+  return label;
 }
 
-// Создаёт крупную неоновую кнопку: прямоугольник + надпись.
-// Возвращает прямоугольник; надпись лежит в свойстве button.label.
+// Рисует пиксельную табличку (как таблички на дверях кабинетов и мебель):
+// тёмный контур с вырезанными углами, заливка, тёмная нижняя грань.
+// Координаты — центр (x, y); px — размер «пикселя» рамки.
+function drawPlate(graphics, x, y, width, height, fill, shade, px = 6) {
+  const left = Math.round(x - width / 2);
+  const top = Math.round(y - height / 2);
+  const w = Math.round(width);
+  const h = Math.round(height);
+  // контур без углов
+  graphics.fillStyle(CONFIG.COLORS.INK, 1);
+  graphics.fillRect(left + px, top, w - px * 2, h);
+  graphics.fillRect(left, top + px, w, h - px * 2);
+  // заливка
+  graphics.fillStyle(fill, 1);
+  graphics.fillRect(left + px, top + px, w - px * 2, h - px * 2);
+  // нижняя грань (объём 3/4, как у предметов поликлиники)
+  graphics.fillStyle(shade, 1);
+  graphics.fillRect(left + px, top + h - px * 2.5, w - px * 2, px * 1.5);
+}
+
+// Создаёт крупную кнопку-табличку: прямоугольник (нажатия и заливка) + рамка + надпись.
+// Возвращает прямоугольник; рамка — button.decor, надпись — button.label.
+// options.primary — зелёная кнопка (главное действие), иначе — побелка.
 function createButton(scene, x, y, label, onClick, options = {}) {
-  const color = options.color !== undefined ? options.color : CONFIG.COLORS.PLAYER;
+  const C = CONFIG.COLORS;
   const width = Math.max(options.width || 440, CONFIG.UI.BUTTON_MIN_SIZE);
   const height = Math.max(options.height || 130, CONFIG.UI.BUTTON_MIN_SIZE);
   const fontSize = options.fontSize || 48;
+  const fill = options.primary ? C.PAINT : C.PAPER;
+  const shade = options.primary ? C.PAINT_DARK : C.PAPER_SHADE;
 
-  const button = scene.add.rectangle(x, y, width, height, color, 0.15)
-    .setStrokeStyle(5, color)
+  const decor = scene.add.graphics({ x: x, y: y });
+  const draw = (pressed) => {
+    decor.clear();
+    drawPlate(decor, 0, 0, width, height, pressed ? shade : fill, pressed ? fill : shade);
+  };
+  draw(false);
+
+  // Невидимая зона нажатия поверх рамки
+  const button = scene.add.rectangle(x, y, width, height, 0x000000, 0.001)
     .setInteractive({ useHandCursor: true });
+  button.decor = decor;
+  button.label = createText(scene, x, y - 4, label, fontSize, C.INK);
 
-  button.label = createText(scene, x, y, label, fontSize, color);
-
-  // Подсветка при нажатии
-  button.on('pointerdown', () => button.setFillStyle(color, 0.4));
-  button.on('pointerout', () => button.setFillStyle(color, 0.15));
+  // Нажатие: табличка «утапливается»
+  button.on('pointerdown', () => { draw(true); button.label.setY(button.y); });
+  button.on('pointerout', () => { draw(false); button.label.setY(button.y - 4); });
   // Действие срабатывает, когда палец отпущен над кнопкой
   button.on('pointerup', () => {
-    button.setFillStyle(color, 0.15);
+    draw(false);
+    button.label.setY(button.y - 4);
     onClick();
   });
 
   return button;
+}
+
+// Все части кнопки — для добавления в контейнер
+function buttonParts(button) {
+  return [button.decor, button, button.label];
 }
 
 // Ставит контейнер с вёрсткой по центру экрана и уменьшает его, если не помещается.
@@ -307,6 +354,9 @@ function setItemsVisible(items, visible) {
     item.setVisible(visible);
     if (item.label) {
       item.label.setVisible(visible);
+    }
+    if (item.decor) {
+      item.decor.setVisible(visible);
     }
     if (item.input) {
       item.input.enabled = visible;

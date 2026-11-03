@@ -235,8 +235,8 @@ class GameScene extends Phaser.Scene {
       this.getStartHintY(),
       'Управляй джойстиком внизу экрана',
       32,
-      CONFIG.COLORS.TEXT_DIM
-    ).setBackgroundColor('#05060fcc').setPadding(18, 8, 18, 8) // тёмная плашка — читается на любом полу
+      CONFIG.COLORS.PAPER
+    ).setBackgroundColor(colorToCss(CONFIG.COLORS.INK)).setPadding(18, 8, 18, 10) // тёмная плашка — читается на любом полу
       .setDepth(50).setScrollFactor(0); // не уезжает вместе с камерой
   }
 
@@ -245,30 +245,31 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   createIndicators() {
+    // Пиксельные стрелки (assets/ui/arrow.png): по одной на каждого врага и на таблетку.
     // Рисуются в координатах экрана (не уезжают с камерой), поверх арены
-    this.indicators = this.add.graphics().setScrollFactor(0).setDepth(90);
-  }
-
-  updateIndicators() {
-    const graphics = this.indicators;
-    graphics.clear();
-
-    this.chasers.forEach((chaser) => {
-      // Враг готовит рывок — стрелка белая, как и он сам
-      const color = chaser.dashState === 'telegraph' ? 0xffffff : chaser.role.color;
-      this.drawIndicator(graphics, chaser.x, chaser.y, color);
-    });
-    if (this.bonus.active) {
-      this.drawIndicator(graphics, this.bonus.x, this.bonus.y, CONFIG.INDICATORS.BONUS_COLOR);
+    this.indicators = [];
+    for (let i = 0; i < this.chasers.length + 1; i++) {
+      this.indicators.push(this.add.image(0, 0, 'ui-arrow').setScrollFactor(0).setDepth(90).setVisible(false));
     }
   }
 
+  updateIndicators() {
+    this.chasers.forEach((chaser, i) => {
+      // Враг готовит рывок — стрелка белая, как и он сам
+      const color = chaser.dashState === 'telegraph' ? 0xffffff : chaser.role.color;
+      this.placeIndicator(this.indicators[i], chaser.x, chaser.y, color, true);
+    });
+    const bonusArrow = this.indicators[this.chasers.length];
+    this.placeIndicator(bonusArrow, this.bonus.x, this.bonus.y, CONFIG.INDICATORS.BONUS_COLOR, this.bonus.active);
+  }
+
   // Стрелка на краю экрана в направлении цели (только если цели не видно)
-  drawIndicator(graphics, targetX, targetY, color) {
+  placeIndicator(arrow, targetX, targetY, color, enabled) {
     const I = CONFIG.INDICATORS;
     const camera = this.cameras.main;
     const view = camera.worldView;
-    if (view.contains(targetX, targetY)) {
+    if (!enabled || view.contains(targetX, targetY)) {
+      arrow.setVisible(false);
       return;
     }
 
@@ -282,32 +283,21 @@ class GameScene extends Phaser.Scene {
       dx !== 0 ? (halfW - I.MARGIN) / Math.abs(dx) : Infinity,
       dy !== 0 ? (halfH - I.MARGIN) / Math.abs(dy) : Infinity
     );
-    const x = halfW + dx * k;
-    const y = halfH + dy * k;
 
-    // Чем ближе цель к игроку, тем крупнее стрелка
+    // Чем ближе цель к игроку, тем крупнее стрелка; масштаб — целый (пиксели ровные)
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, targetX, targetY);
     const t = Phaser.Math.Clamp((distance - I.NEAR_DISTANCE) / (I.FAR_DISTANCE - I.NEAR_DISTANCE), 0, 1);
-    const size = Phaser.Math.Linear(I.SIZE_NEAR, I.SIZE_FAR, t);
+    const scale = t < 0.5 ? I.SCALE_NEAR : I.SCALE_FAR;
 
-    // Треугольник остриём к цели
-    const angle = Math.atan2(dy, dx);
-    const tipX = x + Math.cos(angle) * size;
-    const tipY = y + Math.sin(angle) * size;
-    const backX = x - Math.cos(angle) * size * 0.6;
-    const backY = y - Math.sin(angle) * size * 0.6;
-    const sideX = Math.cos(angle + Math.PI / 2) * size * 0.8;
-    const sideY = Math.sin(angle + Math.PI / 2) * size * 0.8;
+    // Направление — одно из 8. Пиксель-арт поворачиваем только на 90°:
+    // для диагоналей есть отдельная картинка (стрелка вправо-вниз)
+    const step = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+    const diagonal = step % 2 === 1;
+    arrow.setTexture(diagonal ? 'ui-arrow-diag' : 'ui-arrow')
+      .setRotation((diagonal ? step - 1 : step) * Math.PI / 4);
 
-    graphics.fillStyle(color, 0.95);
-    graphics.lineStyle(3, 0x05060f, 0.9);
-    graphics.beginPath();
-    graphics.moveTo(tipX, tipY);
-    graphics.lineTo(backX + sideX, backY + sideY);
-    graphics.lineTo(backX - sideX, backY - sideY);
-    graphics.closePath();
-    graphics.fillPath();
-    graphics.strokePath();
+    arrow.setPosition(Math.round(halfW + dx * k), Math.round(halfH + dy * k))
+      .setScale(scale).setTint(color).setVisible(true);
   }
 
   // Итоговое направление движения: джойстик важнее клавиатуры
