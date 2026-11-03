@@ -29,6 +29,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.dodgeDirection = new Phaser.Math.Vector2(0, 1);
     this.invulnerableTimer = 0; // неуязвимость после того, как маска спасла
     this.speedBoost = 1;        // валидол ускоряет
+    this.wet = false;           // мокрый пол после санитарки: скользит и заносит
   }
 
   isDodging() {
@@ -91,7 +92,16 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const targetSpeed = Math.min(1, inputLength) * P.SPEED * this.speedBoost;
     let speed = velocity.length();
 
-    if (targetSpeed > 0) {
+    if (this.wet) {
+      // Мокрый пол: вектор скорости меняется плавно — занос на поворотах и долгий «доезд»
+      const W = CONFIG.PUDDLE;
+      const tx = inputLength > 0 ? inputX / inputLength * targetSpeed : 0;
+      const ty = inputLength > 0 ? inputY / inputLength * targetSpeed : 0;
+      const rate = targetSpeed > 0 ? P.ACCELERATION * W.SLIP_ACCEL : P.DECELERATION * W.SLIP_DECEL;
+      const k = 1 - Math.exp(-rate * dt);
+      velocity.x += (tx - velocity.x) * k;
+      velocity.y += (ty - velocity.y) * k;
+    } else if (targetSpeed > 0) {
       const rate = targetSpeed > speed ? P.ACCELERATION : P.DECELERATION;
       speed += (targetSpeed - speed) * (1 - Math.exp(-rate * dt));
       velocity.set(inputX / inputLength * speed, inputY / inputLength * speed);

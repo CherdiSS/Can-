@@ -34,7 +34,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     this.slideTime = 0;
 
     // Точка, к которой враг сейчас идёт (зависит от роли)
-    this.target = new Phaser.Math.Vector2(role.start.x, role.start.y);
+    this.target = new Phaser.Math.Vector2(x, y);
 
     // Рывок: 'chase' | 'telegraph' | 'dash'
     this.dashState = 'chase';
@@ -194,6 +194,10 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
 
     // Упёрлись в препятствие — в основном едем вдоль него
     let currentTurnRate = turnRate;
+    // Мокрый пол после санитарки — поворачивает хуже, заносит
+    if (ctx.isWet && ctx.isWet(this.x, this.y)) {
+      currentTurnRate *= CONFIG.PUDDLE.CHASER_TURN;
+    }
     if (this.slideTime > 0) {
       this.slideTime -= ctx.dt;
       dirX = this.slideDirection.x + dirX * 0.3;

@@ -41,6 +41,11 @@ class Spr:
                 if (x - cx) ** 2 + (y - cy) ** 2 <= r * r + r * 0.6:
                     self.put(x, y, col)
 
+    def frame(self, x0, y0, x1, y1, col):
+        """Рамка толщиной 1 px."""
+        self.rect(x0, y0, x1, y0, col); self.rect(x0, y1, x1, y1, col)
+        self.rect(x0, y0, x0, y1, col); self.rect(x1, y0, x1, y1, col)
+
     def box(self, x0, y0, x1, y1, fill):
         self.rect(x0, y0, x1, y1, OUT)
         self.rect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill)
@@ -482,6 +487,120 @@ PILLS = {
 }
 
 
+# ---------------------------------------------------------------- санитарка со шваброй
+def cleaner(P=STAND):
+    s = Spr(64)
+    SKIN, SKIN_SH = c(236, 196, 168), c(196, 150, 128)
+    ROBE, ROBE_SH, ROBE_HI = c(70, 112, 178), c(46, 78, 134), c(116, 156, 214)
+    SCARF, SCARF_SH = c(232, 232, 220), c(188, 190, 180)
+    WOOD, MOP, MOP_SH = c(170, 128, 84), c(196, 196, 186), c(150, 150, 142)
+    SHOE, RED = c(60, 60, 70), c(214, 80, 90)
+    RIM = c(214, 214, 200)        # нейтральный персонаж — светлый контур
+    back = P['back']
+    bx, by = P['sway'], P['bob']
+
+    legs(s, P, (25, 29), (33, 37), 48, 57, (24, 30), (32, 38), SKIN, SKIN_SH, SHOE)
+    # швабра в правой руке: черенок и тряпка (тряпка на полу — не подпрыгивает)
+    s.at(bx, by + P['armR'])
+    s.rect(47, 8, 48, 54, WOOD); s.rect(48, 8, 48, 54, c(130, 96, 62))
+    s.at(0, 0)
+    s.rrect(40, 55, 55, 60, 1, MOP); s.rect(41, 59, 54, 60, MOP_SH)
+    for x in range(41, 55, 3):
+        s.put(x, 61, MOP_SH)
+    # халат
+    s.at(bx, by)
+    s.rrect(19, 24, 44, 52, 3, ROBE)
+    s.rect(19, 27, 21, 51, ROBE_SH); s.rect(40, 27, 41, 49, ROBE_HI)
+    s.rect(19, 50, 44, 52, ROBE_SH)
+    if not back:
+        s.rect(28, 24, 35, 27, SCARF)                    # белый воротник
+        s.rect(31, 28, 32, 51, ROBE_SH)                  # застёжка
+        s.rect(24, 40, 30, 46, ROBE_HI); s.rect(24, 40, 30, 40, ROBE_SH)   # карман
+    else:
+        s.rect(24, 38, 39, 39, ROBE_SH)                  # пояс сзади
+    s.rect(29, 22, 34, 24, SKIN_SH)                      # шея
+    # голова в платке
+    s.rrect(22, 6, 41, 23, 6, SKIN)
+    s.rect(38, 13, 41, 21, SKIN_SH)
+    s.rrect(20, 3, 43, 14, 5, SCARF); s.rect(20, 10, 22, 20, SCARF); s.rect(41, 10, 43, 20, SCARF)
+    s.rect(20, 12, 21, 20, SCARF_SH)
+    if not back:
+        for ex in (27, 35):                              # глаза
+            s.rect(ex, 15, ex + 1, 16, OUT)
+        s.put(25, 19, RED); s.put(38, 19, RED)
+        s.rect(30, 20, 33, 20, c(170, 90, 90))           # рот
+    else:
+        s.rrect(21, 3, 42, 22, 6, SCARF); s.rect(21, 14, 42, 15, SCARF_SH)
+        s.rect(29, 22, 34, 25, SCARF); s.rect(30, 26, 30, 28, SCARF); s.rect(33, 26, 33, 27, SCARF)   # узел
+    # руки
+    s.at(bx, by + P['armL'])
+    s.rrect(14, 27, 18, 44, 1, ROBE); s.rect(14, 29, 14, 43, ROBE_SH)
+    s.rrect(14, 45, 18, 48, 1, SKIN)
+    s.at(bx, by + P['armR'])
+    s.rrect(44, 27, 49, 38, 1, ROBE); s.rect(48, 29, 49, 37, ROBE_SH)
+    s.box(44, 36, 50, 42, SKIN)
+    s.finish(RIM, mirror=back)
+    return s
+
+
+# ---------------------------------------------------------------- бабушка в очереди
+def granny(P=STAND):
+    s = Spr(64)
+    SKIN, SKIN_SH = c(232, 200, 178), c(190, 152, 136)
+    COAT, COAT_SH, COAT_HI = c(140, 98, 70), c(100, 68, 48), c(176, 130, 96)
+    SCARF, SCARF_SH, DOT = c(196, 58, 70), c(140, 36, 50), c(246, 224, 120)
+    CANE, BAG, BAG_SH = c(110, 80, 56), c(70, 64, 90), c(48, 44, 66)
+    STOCK, SHOE, GLASS = c(120, 110, 104), c(40, 36, 40), c(200, 220, 230)
+    RIM = c(214, 214, 200)        # нейтральный персонаж — светлый контур
+    back = P['back']
+    bx, by = P['sway'], P['bob']
+
+    legs(s, P, (26, 29), (34, 37), 50, 57, (24, 30), (33, 39), STOCK, STOCK, SHOE)
+    # трость в правой руке (упирается в пол)
+    s.at(0, 0)
+    s.rect(48, 34, 49, 60, CANE)
+    s.at(bx, by + P['armR'])
+    s.rect(45, 32, 49, 33, CANE)                         # ручка трости
+    # пальто, чуть сгорбленная
+    s.at(bx, by)
+    s.rrect(18, 26, 45, 54, 4, COAT)
+    s.rect(18, 29, 20, 53, COAT_SH); s.rect(41, 29, 42, 51, COAT_HI)
+    s.rect(18, 52, 45, 54, COAT_SH)
+    if not back:
+        s.rect(31, 30, 32, 53, COAT_SH)
+        for y in (34, 40, 46):                           # пуговицы
+            s.put(29, y, COAT_SH); s.put(34, y, COAT_SH)
+    s.rect(28, 24, 35, 26, SKIN_SH)                      # шея
+    # голова в цветастом платке
+    s.rrect(22, 9, 41, 26, 6, SKIN)
+    s.rect(38, 15, 41, 24, SKIN_SH)
+    s.rrect(19, 6, 44, 17, 6, SCARF); s.rect(19, 12, 22, 24, SCARF); s.rect(41, 12, 44, 24, SCARF)
+    s.rect(19, 15, 20, 24, SCARF_SH)
+    for (dx, dy) in ((24, 8), (30, 7), (36, 9), (21, 15), (42, 16), (27, 11), (39, 12)):
+        s.put(dx, dy, DOT)
+    if not back:
+        s.rect(25, 17, 29, 19, GLASS); s.rect(34, 17, 38, 19, GLASS)     # очки
+        s.rect(30, 18, 33, 18, OUT); s.frame(25, 17, 29, 19, OUT); s.frame(34, 17, 38, 19, OUT)
+        s.rect(29, 23, 34, 23, c(160, 96, 96))           # рот
+        s.rect(26, 26, 37, 28, SCARF)                    # концы платка под подбородком
+    else:
+        s.rrect(20, 7, 43, 25, 6, SCARF)
+        for (dx, dy) in ((24, 10), (31, 9), (37, 12), (26, 18), (35, 20), (30, 15)):
+            s.put(dx, dy, DOT)
+        s.rect(29, 25, 34, 28, SCARF); s.rect(30, 29, 30, 31, SCARF); s.rect(33, 29, 33, 30, SCARF)   # узел
+    # левая рука с сумкой
+    s.at(bx, by + P['armL'])
+    s.rrect(13, 29, 17, 44, 1, COAT); s.rect(13, 31, 13, 43, COAT_SH)
+    s.rrect(13, 45, 17, 47, 1, SKIN)
+    s.box(8, 44, 18, 54, BAG); s.rect(9, 51, 17, 53, BAG_SH); s.rect(11, 41, 15, 43, BAG_SH)
+    # правая рука на трости
+    s.at(bx, by + P['armR'])
+    s.rrect(44, 28, 48, 36, 1, COAT); s.rect(47, 30, 48, 35, COAT_SH)
+    s.rrect(45, 35, 49, 38, 1, SKIN)
+    s.finish(RIM, mirror=back)
+    return s
+
+
 # Лист кадров 64×64 в один ряд (12 кадров, 768×64):
 #   0–1  дыхание лицом к зрителю   2–5  бег лицом к зрителю
 #   6–7  дыхание спиной            8–11 бег спиной (бежит вверх по экрану)
@@ -492,6 +611,8 @@ CHARACTERS = {
     "enemy_hunter_sheet.png": (hunter, 3, 2, -1, 0),
     "enemy_interceptor_sheet.png": (interceptor, 2, 1, -1, 0),   # шаркает
     "enemy_heavy_sheet.png": (heavy, 2, 1, -1, 1),               # переваливается
+    "npc_cleaner_sheet.png": (cleaner, 2, 1, -1, 0),             # санитарка: спокойный шаг
+    "npc_granny_sheet.png": (granny, 1, 1, 0, 1),                # бабушка: мелкие шажки вразвалку
 }
 
 

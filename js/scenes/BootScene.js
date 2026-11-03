@@ -16,6 +16,7 @@ class BootScene extends Phaser.Scene {
     CONFIG.CHASER.ROLES.forEach((role) => {
       this.load.spritesheet(role.texture, role.sprite, frame);
     });
+    Object.values(CONFIG.NPC).forEach((npc) => this.load.spritesheet(npc.texture, npc.sprite, frame));
     this.load.image(CONFIG.BONUS.TEXTURE, CONFIG.BONUS.SPRITE);
     Object.values(CONFIG.PILLS.TYPES).forEach((pill) => this.load.image(pill.texture, pill.sprite));
 
@@ -29,6 +30,7 @@ class BootScene extends Phaser.Scene {
     this.load.image('ui-ring', 'assets/ui/ring.png');
     this.load.image('ui-arrow', 'assets/ui/arrow.png');
     this.load.image('ui-arrow-diag', 'assets/ui/arrow_diag.png');
+    this.load.image('ui-puddle', 'assets/ui/puddle.png');
   }
 
   create() {
@@ -39,13 +41,15 @@ class BootScene extends Phaser.Scene {
       .concat(['floor_tile', 'wall_north', 'wall_side', 'wall_bottom', 'decal_seam', 'decal_wear', 'decal_mat']
         .map((key) => 'env-' + key))
       .concat(CONFIG.ENVIRONMENT.LOOKS.map((look) => 'obstacle-' + look))
-      .concat(['ui-ring', 'ui-arrow', 'ui-arrow-diag']);
+      .concat(Object.values(CONFIG.NPC).map((npc) => npc.texture))
+      .concat(['ui-ring', 'ui-arrow', 'ui-arrow-diag', 'ui-puddle']);
     keys.forEach((key) => {
       this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
 
     this.createCharacterAnimations(CONFIG.PLAYER.TEXTURE, CONFIG.PLAYER.RUN_FPS);
     CONFIG.CHASER.ROLES.forEach((role) => this.createCharacterAnimations(role.texture, role.runFps));
+    Object.values(CONFIG.NPC).forEach((npc) => this.createCharacterAnimations(npc.texture, npc.runFps));
 
     // Ждём пиксельный шрифт: иначе первые надписи нарисуются запасным шрифтом
     this.waitForFont().then(() => this.scene.start('MenuScene'));

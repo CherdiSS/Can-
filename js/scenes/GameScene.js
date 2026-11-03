@@ -31,6 +31,14 @@ class GameScene extends Phaser.Scene {
     this.pillsSpawned = 0;
     this.lastSpecial = null;
     this.zzzTimer = 0;
+
+    // Кабинеты: кто и когда выходит, укрытие героини, персонажи поликлиники, лужи
+    this.spawnQueue = CONFIG.SPAWNS.map((entry) => Object.assign({ door: null, done: false }, entry));
+    this.doors = CONFIG.DOORS.LIST.map((door) => Object.assign({ cooldown: 0, blink: 0 }, door));
+    this.hiding = null;
+    this.npcs = [];
+    this.puddles = [];
+    this.slipNoticeTimer = 0;
   }
 
   create() {
@@ -49,6 +57,7 @@ class GameScene extends Phaser.Scene {
     this.createStartHint();
     this.createIndicators();
     this.createEffectsHud();
+    this.doorGraphics = this.add.graphics().setDepth(3); // мигание дверей и лампочки «занято»
 
     // Уворот: кнопка в панели, на компьютере — пробел или Shift
     Hud.onDodge = () => this.tryDodge();
@@ -83,25 +92,49 @@ class GameScene extends Phaser.Scene {
     // Ограничиваем шаг, чтобы после подвисания враги не «прыгали»
     const dt = Math.min(delta, 100) / 1000;
     this.elapsed += dt;
-    this.scoredTime += dt;
+    // В кабинете очки за время не идут
+    if (!this.hiding) {
+      this.scoredTime += dt;
+    }
+
+    this.updateSpawns();
+    this.updateDoors(dt);
+    this.updateNpcs(dt);
+    this.updatePuddles(dt);
 
     const difficulty = this.getDifficulty(this.elapsed);
     const input = this.getMoveInput();
 
     this.updateEffects(dt);
-    this.player.move(input.x, input.y, dt);
+    this.updateHiding(dt);
+    if (!this.hiding) {
+      // Мокрый пол: разгон и торможение героини намного медленнее — скользит
+      const wet = this.isWet(this.player.x, this.player.y);
+      this.player.wet = wet;
+      this.slipNoticeTimer -= dt;
+      if (wet && this.slipNoticeTimer <= 0 && this.player.moveVelocity.length() > 100) {
+        this.slipNoticeTimer = 3;
+        this.popup(this.player.x, this.player.y - 20, 'скользко!', CONFIG.COLORS.PAPER);
+      }
+      this.player.move(input.x, input.y, dt);
+    }
     Hud.setDodge(this.player.dodgeCooldown / CONFIG.DODGE.COOLDOWN);
+
+    // Пока героиня в кабинете, пациенты топчутся у двери
+    const target = this.hiding ? this.hiding.proxy : this.player;
 
     // Общие данные кадра для всех врагов
     const ctx = {
       dt: dt,
-      player: this.player,
+      player: target,
       chasers: this.chasers,
       bonus: this.bonus,
       obstacleRects: this.obstacleRects,
       speedMultiplier: difficulty.speedMultiplier,
       turnProgress: difficulty.turnProgress,
-      dashInterval: difficulty.dashInterval,
+      dashInterval: this.hiding ? null : difficulty.dashInterval,
+      // Мокрый пол — пациенты хуже поворачивают
+      isWet: (x, y) => this.isWet(x, y),
       // Рывок — только если пациента видно на экране (без прыжков из-за края)
       view: this.cameras.main.worldView,
       // Таблетки: снотворное — все спят, слабительное — все убегают
@@ -224,12 +257,16 @@ class GameScene extends Phaser.Scene {
   createChasers() {
     // Обычный массив: Phaser-коллайдеры умеют работать с массивами
     // Три врага с разными ролями: Охотник, Перехватчик, Тяжёлый загонщик
-    this.chasers = CONFIG.CHASER.ROLES.map((role) => this.addChaser(role, role.start.x, role.start.y));
+    // Пациенты выходят из кабинетов по расписанию (CONFIG.SPAWNS)
+    this.chasers = [];
   }
 
   // Новый пациент: звуки его рывков и тяжёлых шагов
   addChaser(role, x, y) {
     const chaser = new Chaser(this, role, x, y);
+    this.chasers.push(chaser);
+    // Стрелка у края экрана для этого пациента
+    chaser.arrow = this.add.image(0, 0, 'ui-arrow').setScrollFactor(0).setDepth(90).setVisible(false);
     if (role.key === 'heavy') {
       chaser.on('animationupdate', (anim, frame) => {
         if (anim.key.endsWith('run') && (frame.index === 2 || frame.index === 4)) {
@@ -333,20 +370,17 @@ class GameScene extends Phaser.Scene {
   createIndicators() {
     // Пиксельные стрелки (assets/ui/arrow.png): по одной на каждого врага и на таблетку.
     // Рисуются в координатах экрана (не уезжают с камерой), поверх арены
-    this.indicators = [];
-    for (let i = 0; i < this.chasers.length + 1; i++) {
-      this.indicators.push(this.add.image(0, 0, 'ui-arrow').setScrollFactor(0).setDepth(90).setVisible(false));
-    }
+    // Стрелки пациентов создаются вместе с ними (addChaser), здесь — стрелка таблетки
+    this.bonusArrow = this.add.image(0, 0, 'ui-arrow').setScrollFactor(0).setDepth(90).setVisible(false);
   }
 
   updateIndicators() {
-    this.chasers.forEach((chaser, i) => {
+    this.chasers.forEach((chaser) => {
       // Враг готовит рывок — стрелка белая, как и он сам
       const color = chaser.dashState === 'telegraph' ? 0xffffff : chaser.role.color;
-      this.placeIndicator(this.indicators[i], chaser.x, chaser.y, color, true);
+      this.placeIndicator(chaser.arrow, chaser.x, chaser.y, color, true);
     });
-    const bonusArrow = this.indicators[this.chasers.length];
-    this.placeIndicator(bonusArrow, this.bonus.x, this.bonus.y, this.bonus.getColor(), this.bonus.active);
+    this.placeIndicator(this.bonusArrow, this.bonus.x, this.bonus.y, this.bonus.getColor(), this.bonus.active);
   }
 
   // Стрелка на краю экрана в направлении цели (только если цели не видно)
@@ -635,6 +669,183 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  // ---------------------------------------------------------------
+  // Кабинеты: появление персонажей из дверей и укрытие героини
+  // ---------------------------------------------------------------
+
+  // Кто должен выйти: за TELEGRAPH секунд дверь мигает и скрипит, потом — выход
+  updateSpawns() {
+    const T = CONFIG.DOORS.TELEGRAPH;
+    this.spawnQueue.forEach((entry) => {
+      if (entry.done) {
+        return;
+      }
+      if (!entry.door && this.elapsed >= entry.at - T) {
+        entry.door = this.pickSpawnDoor();
+        entry.door.blink = T;
+        Sound.play('door', { volume: Math.max(0.35, this.soundVolumeAt(entry.door.x, CONFIG.DOORS.FRONT_Y)) });
+      }
+      if (this.elapsed >= entry.at) {
+        entry.door = entry.door || this.pickSpawnDoor();
+        entry.done = true;
+        this.spawnFromDoor(entry);
+      }
+    });
+  }
+
+  // Дверь подальше от героини (и не та, где она прячется, и не та, что уже мигает)
+  pickSpawnDoor() {
+    const candidates = this.doors.filter((door) => door.blink <= 0 && !(this.hiding && this.hiding.door === door));
+    const list = candidates.length ? candidates : this.doors;
+    return list.reduce((best, door) => {
+      const d = Phaser.Math.Distance.Between(door.x, CONFIG.DOORS.FRONT_Y, this.player.x, this.player.y);
+      return d > best.d ? { door, d } : best;
+    }, { door: list[0], d: -1 }).door;
+  }
+
+  spawnFromDoor(entry) {
+    const x = entry.door.x;
+    const y = CONFIG.DOORS.FRONT_Y;
+    if (entry.role) {
+      const role = CONFIG.CHASER.ROLES.find((r) => r.key === entry.role);
+      this.addChaser(role, x, y);
+    } else {
+      this.addNpc(entry.npc, x, y);
+    }
+  }
+
+  addNpc(key, x, y) {
+    const npc = new Npc(this, key, x, y);
+    this.npcs.push(npc);
+    npc.puddleTimer = 0;
+    if (npc.cfg.hitboxRadius) {
+      // Бабушку приходится обходить и героине, и пациентам
+      this.physics.add.collider(this.player, npc);
+      this.physics.add.collider(this.chasers, npc);
+    }
+    this.popup(x, y - 30, npc.cfg.name, CONFIG.COLORS.PAPER);
+    return npc;
+  }
+
+  updateNpcs(dt) {
+    this.npcs.forEach((npc) => {
+      const phrase = npc.updateNpc(dt);
+      if (phrase && this.cameras.main.worldView.contains(npc.x, npc.y)) {
+        this.popup(npc.x, npc.y - 30, phrase, CONFIG.COLORS.PAPER);
+      }
+      // Санитарка оставляет лужи
+      if (npc.key === 'cleaner') {
+        npc.puddleTimer -= dt;
+        if (npc.puddleTimer <= 0) {
+          npc.puddleTimer = npc.cfg.puddleEvery;
+          this.addPuddle(npc.x, npc.y + 24);
+        }
+      }
+    });
+  }
+
+  addPuddle(x, y) {
+    const P = CONFIG.PUDDLE;
+    const image = this.add.image(Math.round(x), Math.round(y), 'ui-puddle').setDepth(1);
+    this.puddles.push({ x, y, ttl: P.LIFETIME, image });
+    if (this.puddles.length > P.MAX) {
+      this.puddles.shift().image.destroy();
+    }
+  }
+
+  updatePuddles(dt) {
+    this.puddles = this.puddles.filter((puddle) => {
+      puddle.ttl -= dt;
+      if (puddle.ttl <= 0) {
+        puddle.image.destroy();
+        return false;
+      }
+      puddle.image.setAlpha(Math.min(1, puddle.ttl / 2)); // последние 2 с — подсыхает
+      return true;
+    });
+  }
+
+  // Стоит ли персонаж (точка — центр спрайта, ноги на 24 px ниже) в луже
+  isWet(x, y) {
+    const P = CONFIG.PUDDLE;
+    const feetY = y + 24;
+    return this.puddles.some((puddle) => {
+      const nx = (x - puddle.x) / P.RADIUS_X;
+      const ny = (feetY - puddle.y) / P.RADIUS_Y;
+      return nx * nx + ny * ny <= 1;
+    });
+  }
+
+  // Мигание дверей перед выходом и лампочки над дверями: зелёная — можно спрятаться, красная — занято
+  updateDoors(dt) {
+    const D = CONFIG.DOORS;
+    const g = this.doorGraphics;
+    g.clear();
+    this.doors.forEach((door) => {
+      door.blink = Math.max(0, door.blink - dt);
+      door.cooldown = Math.max(0, door.cooldown - dt);
+      if (door.blink > 0 && Math.floor(door.blink * 8) % 2 === 0) {
+        g.fillStyle(CONFIG.COLORS.PAPER, 0.7);
+        g.fillRect(door.x - 15, D.TOP + 2, 30, D.BOTTOM - D.TOP - 2);
+      }
+      const busy = door.cooldown > 0 || (this.hiding && this.hiding.door === door);
+      g.fillStyle(CONFIG.COLORS.INK, 1);
+      g.fillRect(door.x - 7, 0, 14, 6);
+      g.fillStyle(busy ? CONFIG.COLORS.STAMP : 0x6fd36f, 1);
+      g.fillRect(door.x - 5, 1, 10, 4);
+    });
+  }
+
+  // Укрытие: забежала в свободную дверь — 3 с в кабинете, пациенты ждут у двери
+  updateHiding(dt) {
+    const H = CONFIG.HIDE;
+    if (this.hiding) {
+      this.hiding.timer -= dt;
+      this.hideText.setText(String(Math.max(1, Math.ceil(this.hiding.timer))));
+      if (this.hiding.timer <= 0) {
+        this.leaveCabinet();
+      }
+      return;
+    }
+    if (this.player.isDodging()) {
+      return;
+    }
+    const door = this.doors.find((d) => d.cooldown <= 0 &&
+      Math.abs(this.player.x - d.x) < H.ENTER_DISTANCE && this.player.y < CONFIG.DOORS.BOTTOM + 30);
+    if (door) {
+      this.enterCabinet(door);
+    }
+  }
+
+  enterCabinet(door) {
+    this.hiding = {
+      door: door,
+      timer: CONFIG.HIDE.DURATION,
+      // куда идут пациенты, пока героини не видно: к двери
+      proxy: { x: door.x, y: CONFIG.DOORS.FRONT_Y + 40, moveVelocity: new Phaser.Math.Vector2(0, 0) }
+    };
+    this.stats.hides += 1;
+    this.player.moveVelocity.set(0, 0);
+    this.player.body.stop();
+    this.player.body.enable = false;
+    this.player.setVisible(false);
+    this.hideText = createText(this, door.x, CONFIG.DOORS.FRONT_Y + 10, '3', 40, CONFIG.COLORS.PAPER, { stroke: 6 }).setDepth(80);
+    this.popup(door.x, CONFIG.DOORS.FRONT_Y + 40, 'кабинет ' + door.number, CONFIG.COLORS.PAPER);
+    Sound.play('hide');
+  }
+
+  leaveCabinet() {
+    const door = this.hiding.door;
+    this.hiding = null;
+    this.hideText.destroy();
+    door.cooldown = CONFIG.HIDE.COOLDOWN;
+    this.player.body.enable = true;
+    this.player.body.reset(door.x, CONFIG.DOORS.FRONT_Y + 12);
+    this.player.setVisible(true);
+    this.player.invulnerableTimer = CONFIG.HIDE.INVULNERABLE_AFTER;
+    Sound.play('door');
+  }
+
   // Комбо в панели: множитель и сколько осталось времени окна
   updateComboHud() {
     const left = CONFIG.COMBO.WINDOW - (this.elapsed - this.lastPillTime);
@@ -669,6 +880,11 @@ class GameScene extends Phaser.Scene {
   // «Проскочила вплотную»: пациент был совсем рядом, но не поймал
   updateNearMisses(dt) {
     const N = CONFIG.NEAR_MISS;
+    if (this.hiding) {
+      // В кабинете «вплотную» не считается: пациенты просто ждут у двери
+      this.chasers.forEach((chaser) => { chaser.nearMissArmed = false; });
+      return;
+    }
     this.chasers.forEach((chaser) => {
       if (!chaser.active) {
         return;

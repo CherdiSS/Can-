@@ -4,6 +4,7 @@
 #  - joystick_knob.png  — ручка джойстика (побелка, тёмная нижняя грань)
 #  - ring.png           — кольцо у ног врага (белое, в игре красится в цвет роли)
 #  - arrow.png          — стрелка у края экрана (белая с тёмным контуром, красится в цвет цели)
+#  - puddle.png         — лужа после санитарки (скользко)
 #  - arrow_diag.png     — та же стрелка по диагонали (вправо-вниз): пиксель-арт не поворачивают на 45°
 import os
 from PIL import Image
@@ -116,9 +117,27 @@ def arrow_diag():
     return im
 
 
+def puddle():
+    # Лужа 64×24: полупрозрачная голубая, с бликами
+    im = Image.new('RGBA', (64, 24), T)
+    p = im.load()
+    for y in range(24):
+        for x in range(64):
+            nx, ny = (x + 0.5 - 32) / 31, (y + 0.5 - 12) / 11
+            wobble = 0.08 * ((x // 6) % 2)
+            d = nx * nx + ny * ny
+            if d <= 1 - wobble:
+                p[x, y] = c(150, 200, 230, 150) if d > 0.7 - wobble else c(170, 214, 238, 120)
+    for (x0, y0, x1) in ((18, 7, 26), (36, 13, 41), (44, 8, 47)):
+        for x in range(x0, x1 + 1):
+            p[x, y0] = c(240, 250, 255, 210)
+    return im
+
+
 disc(30, base_color).save(os.path.join(HERE, 'joystick_base.png'))
 disc(13, knob_color).save(os.path.join(HERE, 'joystick_knob.png'))
 ellipse_ring(46, 14).save(os.path.join(HERE, 'ring.png'))
 arrow().save(os.path.join(HERE, 'arrow.png'))
 arrow_diag().save(os.path.join(HERE, 'arrow_diag.png'))
+puddle().save(os.path.join(HERE, 'puddle.png'))
 print('ok')

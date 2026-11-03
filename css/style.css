@@ -240,6 +240,7 @@ body {
   box-sizing: border-box;
   padding: 0 0 4px;
   display: flex;
+  flex-direction: row; /* две полоски рядом (класс .hud задаёт столбик) */
   align-items: center;
   justify-content: center;
   gap: 8px;
