@@ -1,5 +1,6 @@
 // =============================================================
-// Бонус — жёлтый круг. На арене одновременно максимум один бонус.
+// Бонус — таблетка. Обычная (жёлтая) даёт очки, особые — ещё и эффект
+// (CONFIG.PILLS.TYPES). На арене одновременно максимум одна таблетка.
 // Когда бонус «спрятан», его физическое тело отключено.
 // =============================================================
 
@@ -18,15 +19,23 @@ class Bonus extends Phaser.Physics.Arcade.Sprite {
 
     // Сколько секунд бонус лежит на арене в 3-й фазе
     this.age = 0;
+    this.type = 'points'; // 'points' или ключ из CONFIG.PILLS.TYPES
 
     this.hide();
   }
 
-  // Показать бонус в точке (x, y)
-  spawn(x, y) {
+  // Показать таблетку типа type в точке (x, y)
+  spawn(x, y, type = 'points') {
+    this.type = type;
+    this.setTexture(type === 'points' ? CONFIG.BONUS.TEXTURE : CONFIG.PILLS.TYPES[type].texture);
     this.enableBody(true, x, y, true, true);
     this.age = 0;
     this.setAlpha(1);
+  }
+
+  // Цвет стрелки у края экрана
+  getColor() {
+    return this.type === 'points' ? CONFIG.INDICATORS.BONUS_COLOR : CONFIG.PILLS.TYPES[this.type].color;
   }
 
   // Спрятать бонус и отключить его тело

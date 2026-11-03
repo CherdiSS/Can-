@@ -406,11 +406,10 @@ def heavy(P=STAND):
 
 
 # ---------------------------------------------------------------- бонус: капсула
-def bonus():
+def capsule(main, main_d, main_l, rim):
+    """Капсула 48×48: верхняя половина белая, нижняя — цвета таблетки."""
     s = Spr(48)
-    GOLD, GOLD_D, GOLD_L = c(255, 200, 40), c(214, 146, 22), c(255, 236, 140)
     WHITE, WHITE_SH = c(246, 246, 240), c(188, 192, 204)
-    RIM = c(255, 225, 77)          # бонус: 0xffe14d
     ax, ay, bx, by, r = 13.5, 34.5, 34.5, 13.5, 8.6
     dx, dy = bx - ax, by - ay
     L2 = dx * dx + dy * dy
@@ -425,7 +424,7 @@ def bonus():
             # сторона от оси (нормаль): >0 — нижняя-правая, затенённая
             side = ((px - qx) * 1 + (py - qy) * 1) / 2 ** 0.5
             upper = t > 0.5
-            base, dark, light = (WHITE, WHITE_SH, WHITE) if upper else (GOLD, GOLD_D, GOLD_L)
+            base, dark, light = (WHITE, WHITE_SH, WHITE) if upper else (main, main_d, main_l)
             col = base
             if side > r - 3.2:
                 col = dark
@@ -439,14 +438,48 @@ def bonus():
             t = ((px - ax) * dx + (py - ay) * dy) / L2
             if abs(t - 0.5) < 0.022 and s.p[x, y][3]:
                 s.put(x, y, OUT)
-    s.finish(RIM)
+    s.finish(rim)
     # искорки (без контура)
     for (sx, sy) in ((40, 7), (7, 41)):
         s.put(sx, sy, WHITE)
         for d in (1, 2):
             for (ox, oy) in ((d, 0), (-d, 0), (0, d), (0, -d)):
-                s.put(sx + ox, sy + oy, RIM if d == 2 else WHITE)
+                s.put(sx + ox, sy + oy, rim if d == 2 else WHITE)
     return s
+
+
+def bonus():
+    """Обычная таблетка — жёлтая (очки)."""
+    return capsule(c(255, 200, 40), c(214, 146, 22), c(255, 236, 140), c(255, 225, 77))
+
+
+def mask_item():
+    """Медицинская маска 48×48: голубая, со складками и резинками."""
+    s = Spr(48)
+    BLUE, BLUE_SH, BLUE_L = c(150, 206, 236), c(98, 156, 196), c(204, 236, 250)
+    WIRE, LOOP = c(220, 224, 230), c(240, 240, 236)
+    # резинки
+    for (x0, y0) in ((5, 16), (5, 28)):
+        s.rect(x0, y0, x0 + 6, y0 + 1, LOOP)
+    for (x0, y0) in ((37, 16), (37, 28)):
+        s.rect(x0, y0, x0 + 6, y0 + 1, LOOP)
+    s.rect(5, 16, 6, 29, LOOP); s.rect(42, 16, 43, 29, LOOP)
+    # полотно маски
+    s.rrect(11, 13, 37, 34, 3, BLUE)
+    s.rect(11, 31, 37, 34, BLUE_SH)
+    for y in (18, 23, 28):                           # складки
+        s.rect(12, y, 36, y, BLUE_SH); s.rect(12, y - 1, 36, y - 1, BLUE_L)
+    s.rect(15, 13, 33, 14, WIRE)                     # носовой зажим
+    s.finish(c(130, 220, 255))
+    return s
+
+
+PILLS = {
+    # имя файла: (основной, тень, блик, контур)
+    "pill_validol.png": (c(220, 50, 60), c(160, 26, 40), c(255, 120, 120), c(255, 90, 100)),       # ускорение
+    "pill_sleeping.png": (c(70, 110, 220), c(40, 70, 160), c(140, 170, 255), c(110, 150, 255)),    # снотворное
+    "pill_laxative.png": (c(150, 96, 52), c(104, 64, 34), c(200, 150, 100), c(196, 132, 70)),      # слабительное
+}
 
 
 # Лист кадров 64×64 в один ряд (12 кадров, 768×64):
@@ -479,4 +512,7 @@ if __name__ == "__main__":
     for name, (draw, lift, swing, bob, sway) in CHARACTERS.items():
         sheet(draw, lift, swing, bob, sway).save(os.path.join(OUTDIR, name))
     bonus().save("bonus_pill.png")
+    for name, colors in PILLS.items():
+        capsule(*colors).save(name)
+    mask_item().save("pill_mask.png")
     print("ok")

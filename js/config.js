@@ -203,6 +203,39 @@ const CONFIG = {
     COOLDOWN: 2      // сек — не чаще для одного пациента
   },
 
+  // Уворот героини: короткий рывок, во время которого пациенты не ловят
+  DODGE: {
+    DURATION: 0.2,      // сек
+    SPEED_FACTOR: 2.6,  // во сколько раз быстрее обычного бега
+    COOLDOWN: 3.5,      // сек перезарядки
+    DASH_DODGE_DISTANCE: 110, // пациент пронёсся в рывке ближе этого — «увернулась»
+    DASH_DODGE_POINTS: 50
+  },
+
+  // Таблетки с эффектами: каждая SPECIAL_EVERY-я таблетка — особая (после SPECIAL_AFTER сек)
+  PILLS: {
+    SPECIAL_EVERY: 3,
+    SPECIAL_AFTER: 8,
+    TYPES: {
+      validol: {
+        texture: 'pill-validol', sprite: 'assets/sprites/pill_validol.png', color: 0xff5a64,
+        name: 'Валидол', hint: 'быстрее!', duration: 4, speedBoost: 1.35
+      },
+      sleeping: {
+        texture: 'pill-sleeping', sprite: 'assets/sprites/pill_sleeping.png', color: 0x6e96ff,
+        name: 'Снотворное', hint: 'все спят', duration: 3
+      },
+      mask: {
+        texture: 'pill-mask', sprite: 'assets/sprites/pill_mask.png', color: 0x82dcff,
+        name: 'Маска', hint: 'защита от поимки', duration: 10, stun: 1.2, invulnerable: 1.5
+      },
+      laxative: {
+        texture: 'pill-laxative', sprite: 'assets/sprites/pill_laxative.png', color: 0xc48446,
+        name: 'Слабительное', hint: 'все в туалет!', duration: 4
+      }
+    }
+  },
+
   // Отсчёт 3-2-1 после паузы
   COUNTDOWN: {
     FROM: 3,

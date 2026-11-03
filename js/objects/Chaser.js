@@ -66,7 +66,29 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     const speed = Math.min(CONFIG.PLAYER.SPEED * role.speedFactor * ctx.speedMultiplier, speedCap);
     const turnRate = Phaser.Math.Linear(role.turnBase, role.turnMax, ctx.turnProgress);
 
+    // Снотворное или оглушение маской: стоит на месте, рывок отменяется, не ловит
+    this.stunTimer = Math.max(0, (this.stunTimer || 0) - dt);
+    this.asleep = !!ctx.sleeping || this.stunTimer > 0;
+    if (this.asleep) {
+      if (this.dashState !== 'chase') {
+        this.dashState = 'chase';
+        this.dashCooldown = Math.max(this.dashCooldown, 1.5);
+      }
+      this.moveVelocity.set(0, 0);
+      this.body.setVelocity(0, 0);
+      this.updateVisuals(dt);
+      return;
+    }
+    // Слабительное: убегает от героини и не ловит
+    this.fleeing = !!ctx.fleeing;
+
     this.updateTarget(ctx);
+
+    // Насколько близко пронёсся мимо героини в рывке (для «увернулась!»)
+    if (this.dashState === 'dash') {
+      const distance = Phaser.Math.Distance.Between(this.x, this.y, ctx.player.x, ctx.player.y);
+      this.dashMinDistance = Math.min(this.dashMinDistance, distance);
+    }
 
     if (this.dashState === 'telegraph') {
       this.updateTelegraph(dt, speed);
@@ -85,6 +107,20 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     return this.dashState !== 'chase';
   }
 
+  // Спит, оглушён или бежит в туалет — не ловит
+  isHarmless() {
+    return !!(this.asleep || this.fleeing);
+  }
+
+  // Маска спасла героиню: пациент отлетает и на время оглушён
+  stun(seconds, fromX, fromY) {
+    this.stunTimer = seconds;
+    const dx = this.x - fromX;
+    const dy = this.y - fromY;
+    const length = Math.hypot(dx, dy) || 1;
+    this.body.reset(this.x + dx / length * 30, this.y + dy / length * 30);
+  }
+
   // ---------------------------------------------------------------
   // Выбор цели по роли
   // ---------------------------------------------------------------
@@ -92,6 +128,18 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     const player = ctx.player;
     const role = this.role;
     const distance = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
+
+    if (this.fleeing) {
+      // Подальше от героини (в «туалет»)
+      const dx = this.x - player.x;
+      const dy = this.y - player.y;
+      const length = Math.hypot(dx, dy) || 1;
+      this.target.set(
+        Phaser.Math.Clamp(this.x + dx / length * 400, 0, CONFIG.ARENA.WIDTH),
+        Phaser.Math.Clamp(this.y + dy / length * 400, 0, CONFIG.ARENA.HEIGHT)
+      );
+      return;
+    }
 
     if (role.key === 'interceptor') {
       // Точка впереди игрока по направлению его движения
@@ -258,7 +306,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
 
   tryStartDash(ctx) {
     // Рывки только в 3-й фазе, по одному врагу за раз и после паузы
-    if (ctx.dashInterval === null || ctx.dashBusy || this.dashCooldown > 0) {
+    if (ctx.dashInterval === null || ctx.dashBusy || this.dashCooldown > 0 || this.fleeing) {
       return;
     }
 
@@ -335,6 +383,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
 
     if (this.stateTimer <= 0) {
       this.dashState = 'dash';
+      this.dashMinDistance = Infinity;
       this.scene.events.emit('chaser-dash', this);
       this.stateTimer = this.role.dash.duration;
     }
@@ -364,6 +413,7 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
     this.body.setVelocity(this.moveVelocity.x, this.moveVelocity.y);
     this.recoveryTimer = this.role.dash.recovery;
     this.dashCooldown = this.role.dash.recovery + this.lastDashInterval;
+    this.scene.events.emit('chaser-dash-end', this, this.dashMinDistance);
   }
 
   // ---------------------------------------------------------------
@@ -391,6 +441,10 @@ class Chaser extends Phaser.Physics.Arcade.Sprite {
       } else {
         this.clearTint();
       }
+    } else if (this.asleep) {
+      this.setTint(0x9fb4ff); // спит — синеватый
+    } else if (this.fleeing) {
+      this.setTint(0xc8e0a0); // слабительное — зеленоватый
     } else {
       this.clearTint();
     }

@@ -195,6 +195,7 @@ const Joystick = {
   setEnabled(enabled) {
     this.enabled = enabled;
     this.panel.classList.toggle('is-game', enabled);
+    document.body.classList.toggle('is-game', enabled); // для кнопки паузы на поле
     this.setActive(enabled);
   },
 
@@ -205,6 +206,7 @@ const Joystick = {
       this.reset();
     }
     this.panel.classList.toggle('is-inactive', !active);
+    document.body.classList.toggle('is-inactive', !active);
   },
 
   // Вектор движения или null, если джойстик никто не держит

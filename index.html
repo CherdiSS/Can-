@@ -18,8 +18,10 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- Сюда Phaser вставит canvas с игрой (HUD + арена) -->
-  <div id="game-container"></div>
+  <!-- Сюда Phaser вставит canvas с игрой (арена). Кнопка паузы — в правом верхнем углу поля -->
+  <div id="game-container">
+    <button id="pause-button" class="hud" type="button" aria-label="Пауза"><span></span><span></span></button>
+  </div>
 
   <!-- Нижняя панель управления: своё место на экране, не поверх арены.
        Слева — счёт и таймер, по центру — джойстик, справа — пауза. -->
@@ -33,7 +35,7 @@
       <div id="joystick-knob"></div>
     </div>
     <div id="hud-right" class="hud">
-      <button id="pause-button" type="button" aria-label="Пауза"><span></span><span></span></button>
+      <button id="dodge-button" type="button" aria-label="Уворот"><span id="dodge-label">УВОРОТ</span><div id="dodge-cooldown"></div></button>
     </div>
   </div>
 

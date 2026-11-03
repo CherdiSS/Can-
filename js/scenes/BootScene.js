@@ -17,6 +17,7 @@ class BootScene extends Phaser.Scene {
       this.load.spritesheet(role.texture, role.sprite, frame);
     });
     this.load.image(CONFIG.BONUS.TEXTURE, CONFIG.BONUS.SPRITE);
+    Object.values(CONFIG.PILLS.TYPES).forEach((pill) => this.load.image(pill.texture, pill.sprite));
 
     // Окружение поликлиники: пол, стены, детали пола и предметы-препятствия
     const env = CONFIG.ENVIRONMENT;
@@ -33,6 +34,7 @@ class BootScene extends Phaser.Scene {
   create() {
     // Фильтр NEAREST: при любом масштабировании пиксели остаются чёткими, без размытия
     const keys = [CONFIG.PLAYER.TEXTURE, CONFIG.BONUS.TEXTURE]
+      .concat(Object.values(CONFIG.PILLS.TYPES).map((pill) => pill.texture))
       .concat(CONFIG.CHASER.ROLES.map((role) => role.texture))
       .concat(['floor_tile', 'wall_north', 'wall_side', 'wall_bottom', 'decal_seam', 'decal_wear', 'decal_mat']
         .map((key) => 'env-' + key))

@@ -25,6 +25,12 @@ class GameScene extends Phaser.Scene {
 
     // Статистика партии (для заданий и «диагноза»)
     this.stats = { pills: 0, specialPills: 0, nearMisses: 0, maxCombo: 0, dodges: 0, dashDodges: 0, hides: 0 };
+
+    // Эффекты таблеток: сколько секунд ещё действуют
+    this.effects = { validol: 0, sleeping: 0, mask: 0, laxative: 0 };
+    this.pillsSpawned = 0;
+    this.lastSpecial = null;
+    this.zzzTimer = 0;
   }
 
   create() {
@@ -42,6 +48,10 @@ class GameScene extends Phaser.Scene {
     this.setupKeyboard();
     this.createStartHint();
     this.createIndicators();
+    this.createEffectsHud();
+
+    // Уворот: кнопка в панели, на компьютере — пробел или Shift
+    Hud.onDodge = () => this.tryDodge();
 
     // Высота экрана игры меняется (поворот, панели браузера) — подгоняем камеру
     this.scale.on('resize', this.onResize, this);
@@ -52,6 +62,7 @@ class GameScene extends Phaser.Scene {
     // Звуки рывков пациентов (громче, если рядом)
     this.events.on('chaser-telegraph', this.onChaserTelegraph, this);
     this.events.on('chaser-dash', this.onChaserDash, this);
+    this.events.on('chaser-dash-end', this.onChaserDashEnd, this);
 
     // Пауза/продолжение (их вызывает UIScene)
     this.events.on('pause', this.onScenePause, this);
@@ -77,7 +88,9 @@ class GameScene extends Phaser.Scene {
     const difficulty = this.getDifficulty(this.elapsed);
     const input = this.getMoveInput();
 
+    this.updateEffects(dt);
     this.player.move(input.x, input.y, dt);
+    Hud.setDodge(this.player.dodgeCooldown / CONFIG.DODGE.COOLDOWN);
 
     // Общие данные кадра для всех врагов
     const ctx = {
@@ -91,6 +104,9 @@ class GameScene extends Phaser.Scene {
       dashInterval: difficulty.dashInterval,
       // Рывок — только если пациента видно на экране (без прыжков из-за края)
       view: this.cameras.main.worldView,
+      // Таблетки: снотворное — все спят, слабительное — все убегают
+      sleeping: this.effects.sleeping > 0,
+      fleeing: this.effects.laxative > 0,
       // Рывок одновременно делает только один враг — так честнее и предсказуемее
       dashBusy: this.chasers.some((chaser) => chaser.isDashBusy())
     };
@@ -104,6 +120,7 @@ class GameScene extends Phaser.Scene {
     this.updateComboHud();
     this.updateScore();
     this.updateIndicators();
+    this.updateEffectsHud();
   }
 
   // ---------------------------------------------------------------
@@ -238,8 +255,9 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.obstacles);
     this.physics.add.collider(this.chasers, this.obstacles, this.onChaserHitObstacle, null, this);
 
-    // Поимка игрока
-    this.physics.add.overlap(this.player, this.chasers, this.onPlayerCaught, null, this);
+    // Поимка игрока: не во время уворота и не спящим/убегающим пациентом
+    this.physics.add.overlap(this.player, this.chasers, this.onPlayerCaught,
+      (player, chaser) => !player.isInvulnerable() && !chaser.isHarmless(), this);
 
     // Подбор бонуса
     this.physics.add.overlap(this.player, this.bonus, this.onBonusCollected, null, this);
@@ -263,6 +281,31 @@ class GameScene extends Phaser.Scene {
       a: Phaser.Input.Keyboard.KeyCodes.A,
       s: Phaser.Input.Keyboard.KeyCodes.S,
       d: Phaser.Input.Keyboard.KeyCodes.D
+    });
+    this.input.keyboard.on('keydown-SPACE', this.tryDodge, this);
+    this.input.keyboard.on('keydown-SHIFT', this.tryDodge, this);
+  }
+
+  // Уворот героини: короткий рывок, пациенты не ловят; за героиней — «призраки»
+  tryDodge() {
+    if (this.isGameOver || !this.sys.isActive()) {
+      return;
+    }
+    const input = this.getMoveInput();
+    if (!this.player.tryDodge(input.x, input.y)) {
+      return;
+    }
+    this.stats.dodges += 1;
+    Sound.play('dodge');
+    Sound.vibrate(15);
+    this.time.addEvent({
+      delay: 45,
+      repeat: 3,
+      callback: () => {
+        const ghost = this.add.image(this.player.x, this.player.y, this.player.texture.key, this.player.frame.name)
+          .setFlipX(this.player.flipX).setTintFill(CONFIG.COLORS.PLAYER).setAlpha(0.5).setDepth(9);
+        this.tweens.add({ targets: ghost, alpha: 0, duration: 260, onComplete: () => ghost.destroy() });
+      }
     });
   }
 
@@ -303,7 +346,7 @@ class GameScene extends Phaser.Scene {
       this.placeIndicator(this.indicators[i], chaser.x, chaser.y, color, true);
     });
     const bonusArrow = this.indicators[this.chasers.length];
-    this.placeIndicator(bonusArrow, this.bonus.x, this.bonus.y, CONFIG.INDICATORS.BONUS_COLOR, this.bonus.active);
+    this.placeIndicator(bonusArrow, this.bonus.x, this.bonus.y, this.bonus.getColor(), this.bonus.active);
   }
 
   // Стрелка на краю экрана в направлении цели (только если цели не видно)
@@ -422,7 +465,16 @@ class GameScene extends Phaser.Scene {
       return;
     }
     const position = this.findBonusPosition();
-    this.bonus.spawn(position.x, position.y);
+
+    // Каждая SPECIAL_EVERY-я таблетка — особая (не та же, что в прошлый раз)
+    const P = CONFIG.PILLS;
+    this.pillsSpawned += 1;
+    let type = 'points';
+    if (this.elapsed >= P.SPECIAL_AFTER && this.pillsSpawned % P.SPECIAL_EVERY === 0) {
+      type = Phaser.Utils.Array.GetRandom(Object.keys(P.TYPES).filter((key) => key !== this.lastSpecial));
+      this.lastSpecial = type;
+    }
+    this.bonus.spawn(position.x, position.y, type);
   }
 
   // Ищет случайную свободную точку: не у края, не в препятствии, не рядом с игроком
@@ -483,7 +535,11 @@ class GameScene extends Phaser.Scene {
     }
     const x = bonus.x;
     const y = bonus.y;
+    const type = bonus.type;
     bonus.hide();
+    if (type !== 'points') {
+      this.applyPill(type, x, y);
+    }
 
     // Комбо: успела за окно — множитель растёт, иначе начинается заново
     const C = CONFIG.COMBO;
@@ -498,6 +554,85 @@ class GameScene extends Phaser.Scene {
 
     this.updateScore();
     this.scheduleBonus(CONFIG.BONUS.RESPAWN_DELAY);
+  }
+
+  // ---------------------------------------------------------------
+  // Таблетки с эффектами
+  // ---------------------------------------------------------------
+
+  applyPill(type, x, y) {
+    const T = CONFIG.PILLS.TYPES[type];
+    this.effects[type] = T.duration;
+    this.stats.specialPills += 1;
+    this.popup(x, y - 45, T.name + ': ' + T.hint, T.color);
+    Sound.play(type === 'sleeping' ? 'sleep' : 'powerup');
+    if (type === 'laxative') {
+      this.chasers.forEach((chaser) => this.popup(chaser.x, chaser.y - 30, 'в туалет!', T.color));
+    }
+  }
+
+  updateEffects(dt) {
+    Object.keys(this.effects).forEach((key) => {
+      this.effects[key] = Math.max(0, this.effects[key] - dt);
+    });
+    this.player.speedBoost = this.effects.validol > 0 ? CONFIG.PILLS.TYPES.validol.speedBoost : 1;
+
+    // Спящие пациенты похрапывают
+    if (this.effects.sleeping > 0) {
+      this.zzzTimer -= dt;
+      if (this.zzzTimer <= 0) {
+        this.zzzTimer = 0.7;
+        this.chasers.forEach((chaser) => this.popup(chaser.x + 20, chaser.y - 10, 'z z', CONFIG.PILLS.TYPES.sleeping.color));
+      }
+    }
+  }
+
+  // Плашки активных эффектов в левом верхнем углу экрана: значок и полоска времени
+  createEffectsHud() {
+    this.effectsGraphics = this.add.graphics().setScrollFactor(0).setDepth(95);
+    this.effectIcons = {};
+    Object.entries(CONFIG.PILLS.TYPES).forEach(([key, pill]) => {
+      this.effectIcons[key] = this.add.image(0, 0, pill.texture).setScrollFactor(0).setDepth(96).setVisible(false);
+    });
+    // Маска — защитный «ореол» из пиксельных квадратиков вокруг героини
+    this.auraGraphics = this.add.graphics().setDepth(11);
+  }
+
+  updateEffectsHud() {
+    const g = this.effectsGraphics;
+    g.clear();
+    let row = 0;
+    Object.entries(CONFIG.PILLS.TYPES).forEach(([key, pill]) => {
+      const left = this.effects[key];
+      const icon = this.effectIcons[key];
+      if (left <= 0) {
+        icon.setVisible(false);
+        return;
+      }
+      const y = 44 + row * 64;
+      row += 1;
+      drawPlate(g, 112, y, 200, 56, CONFIG.COLORS.PAPER, CONFIG.COLORS.PAPER_SHADE, 4);
+      icon.setPosition(44, y - 2).setVisible(true);
+      // полоска времени — ступеньками по 10%
+      const fraction = Math.ceil(left / pill.duration * 10) / 10;
+      g.fillStyle(CONFIG.COLORS.INK, 1);
+      g.fillRect(76, y - 10, 116, 16);
+      g.fillStyle(pill.color, 1);
+      g.fillRect(80, y - 6, Math.round(108 * fraction), 8);
+    });
+
+    // Ореол маски
+    const aura = this.auraGraphics;
+    aura.clear();
+    if (this.effects.mask > 0 && !this.isGameOver) {
+      aura.fillStyle(CONFIG.PILLS.TYPES.mask.color, 0.9);
+      const t = this.time.now / 400;
+      for (let i = 0; i < 8; i++) {
+        const a = t + i * Math.PI / 4;
+        aura.fillRect(Math.round((this.player.x + Math.cos(a) * 40 - 4) / 4) * 4,
+          Math.round((this.player.y + Math.sin(a) * 40 - 4) / 4) * 4, 8, 8);
+      }
+    }
   }
 
   // Комбо в панели: множитель и сколько осталось времени окна
@@ -567,12 +702,34 @@ class GameScene extends Phaser.Scene {
     Sound.play('dash', { volume: Math.max(0.4, this.soundVolumeAt(chaser.x, chaser.y)) });
   }
 
+  // Пациент закончил рывок рядом с героиней, но не поймал — «увернулась!»
+  onChaserDashEnd(chaser, minDistance) {
+    const D = CONFIG.DODGE;
+    if (this.isGameOver || !(minDistance < D.DASH_DODGE_DISTANCE)) {
+      return;
+    }
+    this.stats.dashDodges += 1;
+    this.addPoints(D.DASH_DODGE_POINTS, this.player.x, this.player.y - 30, 'увернулась! +' + D.DASH_DODGE_POINTS, CONFIG.COLORS.PLAYER);
+    Sound.play('nearMiss');
+  }
+
   onChaserHitObstacle(chaser, obstacle) {
     chaser.startSliding(obstacle.getBounds());
   }
 
   onPlayerCaught(player, chaser) {
     if (this.isGameOver) {
+      return;
+    }
+    // Маска спасает от одной поимки: пациент отлетает и оглушён, героиня ненадолго неуязвима
+    if (this.effects.mask > 0) {
+      const mask = CONFIG.PILLS.TYPES.mask;
+      this.effects.mask = 0;
+      player.invulnerableTimer = mask.invulnerable;
+      chaser.stun(mask.stun, player.x, player.y);
+      this.popup(player.x, player.y - 40, 'маска спасла!', mask.color);
+      Sound.play('shield');
+      Sound.vibrate(40);
       return;
     }
     this.isGameOver = true;
@@ -639,6 +796,13 @@ class GameScene extends Phaser.Scene {
     this.events.off('resume', this.onSceneResume, this);
     this.events.off('chaser-telegraph', this.onChaserTelegraph, this);
     this.events.off('chaser-dash', this.onChaserDash, this);
+    this.events.off('chaser-dash-end', this.onChaserDashEnd, this);
+    if (this.input.keyboard) {
+      this.input.keyboard.off('keydown-SPACE', this.tryDodge, this);
+      this.input.keyboard.off('keydown-SHIFT', this.tryDodge, this);
+    }
+    Hud.onDodge = null;
+    Hud.setDodge(0);
     this.scale.off('resize', this.onResize, this);
     Hud.setCombo(0, 0);
     // Уходим из игры (меню или рестарт) — джойстик прячется и сбрасывается

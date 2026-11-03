@@ -228,10 +228,16 @@ body {
   background: #b03034;
 }
 
-/* Кнопка паузы: 56×56 — не меньше минимального размера для пальца */
+/* Кнопка паузы: 56×56 — не меньше минимального размера для пальца.
+   В правом верхнем углу игрового поля: пауза нужна редко, место в панели — для уворота */
 #pause-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
   width: 56px;
   height: 56px;
+  box-sizing: border-box;
   padding: 0 0 4px;
   display: flex;
   align-items: center;
@@ -252,8 +258,59 @@ body {
   box-shadow: none;
 }
 
-/* Пауза или поражение — кнопка приглушена */
-#control-panel.is-inactive #pause-button {
+/* Пауза видна только во время игры; на паузе и после поимки — приглушена
+   (классы is-game / is-inactive на body ставит Joystick) */
+#pause-button.hud {
+  visibility: hidden;
+}
+
+body.is-game #pause-button.hud {
+  visibility: visible;
+}
+
+body.is-inactive #pause-button.hud {
+  visibility: hidden; /* на паузе и после поимки не нужна — не закрывает карточки */
+}
+
+/* Кнопка уворота: крупная табличка справа от джойстика, под большой палец.
+   Пока перезаряжается — сверху тёмная «шторка», убывающая ступеньками */
+#dodge-button {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  padding: 0 0 6px;
+  overflow: hidden;
+  background: var(--paper);
+  border: 4px solid var(--ink);
+  box-shadow: inset 0 -6px 0 var(--paper-sh);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px),
+                     calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
+  color: var(--ink);
+  font-family: "Tiny5", monospace;
+  font-size: 15px;
+  touch-action: none;
+  cursor: pointer;
+}
+
+#dodge-button:active {
+  background: var(--paper-sh);
+}
+
+#dodge-cooldown {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0;
+  background: rgba(30, 36, 44, 0.55);
+  pointer-events: none;
+}
+
+#dodge-button.is-ready {
+  background: #e8f0c8; /* готов — чуть светлее */
+}
+
+#control-panel.is-inactive #dodge-button {
   opacity: 0.45;
 }
 

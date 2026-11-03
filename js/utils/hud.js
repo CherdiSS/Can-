@@ -13,6 +13,7 @@ const Hud = {
   timeElement: null,
   pauseButton: null,
   onPause: null, // функция паузы текущей UIScene (или null)
+  onDodge: null, // функция уворота текущей GameScene (или null)
 
   init() {
     this.scoreElement = document.getElementById('hud-score');
@@ -44,6 +45,16 @@ const Hud = {
     this.pauseButton.addEventListener('pointercancel', () => {
       this.pressedPointerId = null;
     });
+    // Уворот — сразу при касании (без ожидания отпускания): важна каждая доля секунды.
+    // Это отдельный палец: джойстик продолжает работать
+    this.dodgeButton = document.getElementById('dodge-button');
+    this.dodgeButton.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      if (this.onDodge) {
+        this.onDodge();
+      }
+    });
+
     // Клавиатура (Enter/Пробел на кнопке в фокусе): click без координат указателя
     this.pauseButton.addEventListener('click', (event) => {
       if (event.detail === 0) {
@@ -61,6 +72,13 @@ const Hud = {
   update(score, seconds) {
     this.scoreElement.textContent = String(score);
     this.timeElement.textContent = formatTime(seconds);
+  },
+
+  // Перезарядка уворота: fraction — доля оставшегося времени (1 → 0); 0 — готов
+  setDodge(fraction) {
+    const steps = Math.ceil(Math.max(0, Math.min(1, fraction)) * 10) * 10;
+    document.getElementById('dodge-cooldown').style.height = steps + '%';
+    this.dodgeButton.classList.toggle('is-ready', steps === 0);
   },
 
   // Комбо: множитель и доля оставшегося окна (1 → 0). multiplier < 2 — скрыть
