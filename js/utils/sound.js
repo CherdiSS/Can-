@@ -185,6 +185,11 @@ const Sound = {
       case 'mission':   // задание выполнено
         [0, 4, 7, 12, 16].forEach((n, i) => this.tone(659 * Math.pow(2, n / 12), 0.09, { volume: 0.12, delay: i * 0.07 }));
         break;
+      case 'flicker':   // лампа дневного света трещит и мигает
+        this.tone(100, 0.18, { type: 'square', volume: 0.025 * v });
+        this.noise(0.06, { from: 5000, volume: 0.04 * v, q: 4 });
+        this.noise(0.05, { from: 5000, volume: 0.03 * v, q: 4, delay: 0.12 });
+        break;
       default:
         break;
     }

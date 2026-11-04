@@ -79,11 +79,10 @@ class UIScene extends Phaser.Scene {
       .setInteractive();
   }
 
-  // Карточка-побелка (как справка или памятка в поликлинике), координаты — от центра
-  createCard(width, height) {
-    const card = this.add.graphics();
-    drawPlate(card, 0, 0, width, height, CONFIG.COLORS.PAPER, CONFIG.COLORS.PAPER_SHADE, 8);
-    return card;
+  // Карточка-бланк (как справка в поликлинике), координаты — от центра.
+  // Подпись «Форма № …» — card.formLabel (её тоже кладём в контейнер)
+  createCard(width, height, formNumber) {
+    return drawForm(this, this.add.graphics(), 0, 0, width, height, formNumber);
   }
 
   // ---------------------------------------------------------------
@@ -95,7 +94,7 @@ class UIScene extends Phaser.Scene {
     this.pauseShade = shade;
 
     // Координаты — относительно центра экрана (контейнер ставится в центр)
-    const card = this.createCard(900, 560);
+    const card = this.createCard(900, 560, '027/у');
     const title = createText(this, 0, -205, 'ПАУЗА', 72);
     // Задания на смену с прогрессом (обновляются при каждой паузе)
     this.pauseMissionTexts = [0, 1, 2].map((i) => createText(this, 0, -132 + i * 36, '', 26, CONFIG.COLORS.PAINT_LINE));
@@ -104,9 +103,9 @@ class UIScene extends Phaser.Scene {
     this.soundButton = createButton(this, 170, 190, '', () => this.toggleSound(), { width: 300, height: 96, fontSize: 34 });
     this.updateSoundLabel();
 
-    this.pauseContent = this.add.container(0, 0, [card, title].concat(this.pauseMissionTexts,
+    this.pauseContent = this.add.container(0, 0, [card, card.formLabel, title].concat(this.pauseMissionTexts,
       buttonParts(resumeButton), buttonParts(menuButton), buttonParts(this.soundButton)));
-    this.pauseItems = [shade, card, title].concat(this.pauseMissionTexts, [resumeButton, menuButton, this.soundButton]);
+    this.pauseItems = [shade, card, card.formLabel, title].concat(this.pauseMissionTexts, [resumeButton, menuButton, this.soundButton]);
   }
 
   // Строка задания: «✓ Собери 5 таблеток» или «Собери 5 таблеток (2/5)»
@@ -227,7 +226,7 @@ class UIScene extends Phaser.Scene {
     const C = CONFIG.COLORS;
     const shade = this.createShade(0.8);
     this.gameOverShade = shade;
-    const card = this.createCard(1100, 620);
+    const card = this.createCard(1100, 620, '095/у');
     const lx = -270; // левая колонка: штамп и итог
     const rx = 270;  // правая: рекорд, задания, открытия и кнопки
 
@@ -262,11 +261,11 @@ class UIScene extends Phaser.Scene {
     });
 
     this.gameOverContent = this.add.container(0, 0, [
-      card, stamp, this.stampText, scoreLabel, this.finalScoreText, this.finalTimeText, this.diagnosisText,
+      card, card.formLabel, stamp, this.stampText, scoreLabel, this.finalScoreText, this.finalTimeText, this.diagnosisText,
       this.newRecordText, this.bestScoreText, this.missionsText, this.unlockText
     ].concat(buttonParts(restartButton), buttonParts(menuButton)));
     this.gameOverItems = [
-      shade, card, stamp, this.stampText, scoreLabel, this.finalScoreText, this.finalTimeText, this.diagnosisText,
+      shade, card, card.formLabel, stamp, this.stampText, scoreLabel, this.finalScoreText, this.finalTimeText, this.diagnosisText,
       this.newRecordText, this.bestScoreText, this.missionsText, this.unlockText, restartButton, menuButton
     ];
   }

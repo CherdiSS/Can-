@@ -9,7 +9,7 @@
 // Добавил новый файл (спрайт, скрипт)? Допиши его в FILES и увеличь VERSION.
 // =============================================================
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE_NAME = 'cgb-' + VERSION;
 const NETWORK_TIMEOUT = 3000; // мс
 
@@ -25,6 +25,7 @@ const FILES = [
   'js/utils/sound.js',
   'js/utils/joystick.js',
   'js/utils/hud.js',
+  'js/utils/lighting.js',
   'js/objects/Player.js',
   'js/objects/Chaser.js',
   'js/objects/Bonus.js',
@@ -62,6 +63,9 @@ const FILES = [
   'assets/sprites/pill_validol.png',
   'assets/environment/decal_mat.png',
   'assets/environment/decal_seam.png',
+  'assets/environment/decal_stain.png',
+  'assets/environment/decal_tear.png',
+  'assets/environment/decal_crack.png',
   'assets/environment/decal_wear.png',
   'assets/environment/floor_tile.png',
   'assets/environment/obstacle_bahily.png',

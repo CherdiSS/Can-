@@ -4,6 +4,10 @@
 // Все спрайты нарисованы в итоговом размере и выводятся без масштабирования.
 // =============================================================
 
+// Картинки окружения из assets/environment/ (ключ в игре — 'env-' + имя файла)
+const ENV_IMAGES = ['floor_tile', 'wall_north', 'wall_side', 'wall_bottom', 'decal_seam', 'decal_wear', 'decal_mat',
+  'decal_stain', 'decal_tear', 'decal_crack'];
+
 class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene');
@@ -24,7 +28,7 @@ class BootScene extends Phaser.Scene {
 
     // Окружение поликлиники: пол, стены, детали пола и предметы-препятствия
     const env = CONFIG.ENVIRONMENT;
-    ['floor_tile', 'wall_north', 'wall_side', 'wall_bottom', 'decal_seam', 'decal_wear', 'decal_mat']
+    ENV_IMAGES
       .forEach((key) => this.load.image('env-' + key, env.PATH + key + '.png'));
     env.LOOKS.forEach((look) => this.load.image('obstacle-' + look, env.PATH + 'obstacle_' + look + '.png'));
 
@@ -41,7 +45,7 @@ class BootScene extends Phaser.Scene {
       .concat(CONFIG.SKINS.filter((skin) => skin.texture !== CONFIG.PLAYER.TEXTURE).map((skin) => skin.texture))
       .concat(Object.values(CONFIG.PILLS.TYPES).map((pill) => pill.texture))
       .concat(CONFIG.CHASER.ROLES.map((role) => role.texture))
-      .concat(['floor_tile', 'wall_north', 'wall_side', 'wall_bottom', 'decal_seam', 'decal_wear', 'decal_mat']
+      .concat(ENV_IMAGES
         .map((key) => 'env-' + key))
       .concat(CONFIG.ENVIRONMENT.LOOKS.map((look) => 'obstacle-' + look))
       .concat(Object.values(CONFIG.NPC).map((npc) => npc.texture))

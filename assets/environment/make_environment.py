@@ -9,19 +9,26 @@ OUTDIR = os.path.dirname(os.path.abspath(__file__))
 T = (0, 0, 0, 0)
 def c(r, g, b): return (r, g, b, 255)
 
-# ---------------- палитра окружения (25 цветов) ----------------
-OUT = c(30, 36, 44)
-P1, P2, PL, PH = c(146, 118, 90), c(137, 110, 84), c(122, 97, 75), c(160, 132, 102)   # линолеум «паркет»
-WW, WW_SH = c(214, 214, 200), c(178, 180, 170)            # побелка
-PANEL, PANEL_D, BORDER = c(122, 164, 140), c(92, 130, 110), c(58, 72, 68)   # масляная панель
-WD_L, WD, WD_D = c(196, 170, 134), c(166, 138, 104), c(116, 92, 70)
-M_L, M, M_D = c(184, 192, 200), c(138, 148, 160), c(92, 100, 112)
-SEAT, SEAT_D = c(82, 112, 140), c(60, 84, 108)
-GR, GR_D = c(104, 148, 92), c(66, 104, 62)
-SH, SH_D = c(226, 230, 226), c(182, 190, 188)
-BURG = c(118, 60, 62)
-GLASS = c(150, 182, 192)
-MAT = c(52, 66, 90)
+# ---------------- палитра «мрачная государственная поликлиника» ----------------
+# Всё блёклое и грязноватое: серо-бурый линолеум, грязная побелка, облупленная
+# зелёная масляная краска, ржавчина, засохший фикус.
+OUT = c(22, 24, 26)
+P1, P2, PL, PH = c(104, 94, 80), c(97, 88, 75), c(82, 74, 63), c(116, 106, 90)   # вытертый линолеум «паркет»
+WW, WW_SH = c(176, 174, 156), c(142, 142, 128)            # грязная побелка
+PANEL, PANEL_D, BORDER = c(84, 110, 92), c(64, 86, 72), c(40, 50, 46)   # масляная панель
+WD_L, WD, WD_D = c(150, 128, 100), c(122, 100, 78), c(84, 66, 52)
+M_L, M, M_D = c(150, 154, 152), c(112, 116, 116), c(74, 78, 80)
+SEAT, SEAT_D = c(72, 86, 98), c(52, 62, 72)
+GR, GR_D = c(106, 116, 72), c(72, 80, 50)                  # фикус засыхает
+SH, SH_D = c(196, 194, 178), c(156, 156, 142)
+BURG = c(96, 54, 52)
+GLASS = c(112, 132, 134)
+MAT = c(48, 52, 56)
+PEEL = c(160, 156, 136)      # штукатурка под облупившейся краской
+RUST, RUST_D = c(112, 74, 48), c(78, 52, 36)
+STAIN = c(72, 66, 56)        # пятна на линолеуме
+CONC, CONC_D = c(118, 118, 112), c(92, 92, 88)   # бетон под порванным линолеумом
+DRY = c(124, 100, 62)        # сухие листья
 
 # ---------------- пиксельный шрифт ----------------
 FONT = {  # буквы 4×5
@@ -43,6 +50,7 @@ DIGITS = {  # цифры 3×5
     '4': ["#.#", "#.#", "###", "..#", "..#"], '5': ["###", "#..", "###", "..#", "###"],
     '6': ["###", "#..", "###", "#.#", "###"], '7': ["###", "..#", ".#.", ".#.", ".#."],
     '8': ["###", "#.#", "###", "#.#", "###"], '9': ["###", "#.#", "###", "..#", "###"],
+    '-': ["...", "...", "###", "...", "..."],
 }
 
 class Img:
@@ -109,6 +117,8 @@ def floor_tile():
                 else:     s.rect(x0 + k * 8, y0, x0 + k * 8 + 7, y0 + 31, col); s.rect(x0 + k * 8, y0, x0 + k * 8, y0 + 31, PL)
     for _ in range(18):
         s.put(rnd.randrange(64), rnd.randrange(64), PH)
+    for _ in range(26):                                   # грязь въелась в стыки
+        s.put(rnd.randrange(64), rnd.randrange(64), STAIN)
     return s
 
 def decal_wear():
@@ -124,6 +134,38 @@ def decal_seam():
     """Шов между полотнами линолеума (вертикальный тайл 2×64)."""
     s = Img(2, 64); s.rect(0, 0, 0, 63, PL); s.rect(1, 0, 1, 63, PH); return s
 
+def decal_stain():
+    """Бурое пятно на линолеуме (неровное, с пиксельной кромкой)."""
+    s = Img(56, 32); rnd = random.Random(21)
+    for y in range(32):
+        for x in range(56):
+            d = ((x - 28) / 28) ** 2 + ((y - 16) / 16) ** 2 + rnd.random() * 0.35
+            if d < 0.75: s.put(x, y, STAIN)
+            elif d < 1 and rnd.random() < 0.4: s.put(x, y, STAIN)
+    return s
+
+def decal_tear():
+    """Порванный линолеум: виден серый бетон, края загнуты."""
+    s = Img(48, 28); rnd = random.Random(8)
+    pts = []
+    for y in range(28):
+        for x in range(48):
+            d = ((x - 24) / 22) ** 2 + ((y - 14) / 11) ** 2 + rnd.random() * 0.25
+            if d < 0.8: s.put(x, y, CONC); pts.append((x, y))
+    for (x, y) in pts:                                    # кромка: тёмный край и светлый загиб
+        if s.p[x, max(0, y - 1)][3] == 0: s.put(x, y, PH)
+        elif y + 1 < 28 and s.p[x, y + 1][3] == 0: s.put(x, y, OUT)
+    for _ in range(14): s.put(rnd.randrange(14, 34), rnd.randrange(8, 20), CONC_D)
+    return s
+
+def decal_crack():
+    """Трещина в линолеуме — ломаная тёмная линия."""
+    s = Img(64, 24); rnd = random.Random(3); x, y = 0, 12
+    while x < 63:
+        s.put(x, y, OUT); s.put(x, y + 1, STAIN)
+        x += 1; y = max(2, min(21, y + rnd.choice((-1, 0, 0, 1))))
+    return s
+
 def decal_mat():
     s = Img(112, 56)
     s.rect(0, 0, 111, 55, MAT); s.frame(0, 0, 111, 55, OUT); s.frame(4, 4, 107, 51, SEAT_D)
@@ -134,28 +176,50 @@ def decal_mat():
 DOOR_CENTERS = (160, 520, 900, 1340, 1720, 2080)
 
 def wall_north(width=2240):
-    """Северная стена целиком: побелка сверху, масляная панель снизу, двери кабинетов, стенды, батареи."""
-    h = 44; s = Img(width, h)
+    """Северная стена: грязная побелка с трещинами, облупленная масляная панель,
+    окна с решётками, двери кабинетов, санбюллетени, ржавые батареи."""
+    h = 44; s = Img(width, h); rnd = random.Random(44)
     s.rect(0, 0, width - 1, 3, WW_SH); s.rect(0, 3, width - 1, 3, OUT)
     s.rect(0, 4, width - 1, 21, WW)
+    for x in range(0, width, 3):                          # разводы и пыль на побелке
+        if rnd.random() < 0.18: s.put(x, rnd.randrange(5, 21), WW_SH)
     s.rect(0, 22, width - 1, 23, BORDER)                 # бордюр между побелкой и панелью
     s.rect(0, 24, width - 1, 39, PANEL); s.rect(0, 36, width - 1, 39, PANEL_D)
     s.rect(0, 40, width - 1, 43, BORDER); s.rect(0, 40, width - 1, 40, OUT)   # плинтус
-    for i, cx in enumerate(DOOR_CENTERS):                # двери кабинетов 101–106
+    # облупившаяся краска: пятна штукатурки на панели
+    for _ in range(width // 70):
+        px, py = rnd.randrange(4, width - 20), rnd.randrange(25, 34)
+        pw, ph = rnd.randrange(4, 14), rnd.randrange(2, 5)
+        s.rect(px, py, px + pw, py + ph, PEEL); s.rect(px, py + ph + 1, px + pw, py + ph + 1, PANEL_D)
+    # трещины на побелке
+    for _ in range(width // 160):
+        x, y = rnd.randrange(10, width - 10), 5
+        while y < 21:
+            s.put(x, y, WW_SH if rnd.random() < 0.5 else BORDER); y += 1; x += rnd.choice((-1, 0, 1))
+    # окна с решётками (в побелке, между дверями)
+    for wx in (330, 700, 1120, 1530, 1900):
+        s.rect(wx - 2, 5, wx + 41, 21, WD_D); s.rect(wx, 7, wx + 39, 20, GLASS)
+        s.rect(wx, 7, wx + 39, 9, c(90, 108, 110)); s.rect(wx + 19, 7, wx + 20, 20, WD_D)
+        for k in range(wx + 4, wx + 40, 5): s.rect(k, 6, k, 21, M_D)      # решётка
+        s.rect(wx - 1, 13, wx + 40, 13, M_D)
+    for i, cx in enumerate(DOOR_CENTERS):                # двери кабинетов 101–106 (крашеные, обшарпанные)
         x = cx - 15
         s.rect(x - 2, 6, x + 31, 43, WD_D)
         s.rect(x, 8, x + 29, 43, WD); s.rect(x + 14, 8, x + 15, 43, WD_D)
         s.rect(x + 24, 26, x + 26, 27, M_L)
+        for _ in range(5): s.put(x + rnd.randrange(1, 29), rnd.randrange(9, 42), WD_L)   # сколы краски
         s.rect(x + 6, 11, x + 23, 18, SH); s.frame(x + 6, 11, x + 23, 18, M_D)
         s.text(x + 9, 12, str(101 + i), BORDER)
-    for sx in (300, 1100, 1900):                         # информационные стенды
-        s.rect(sx, 7, sx + 70, 20, WD_D); s.rect(sx + 2, 9, sx + 68, 19, WD_L)
-        for x in range(sx + 6, sx + 66, 15):
-            s.rect(x, 10, x + 11, 18, SH); s.rect(x + 2, 12, x + 9, 12, SH_D); s.rect(x + 2, 14, x + 7, 14, SH_D)
-        s.rect(sx + 51, 11, sx + 53, 17, GR); s.rect(sx + 49, 13, sx + 55, 15, GR)   # зелёный крест
-    for x in (660, 760, 1480, 1560):                     # чугунные батареи
+    for sx in (240, 1000, 1640):                         # санбюллетени (пожелтевшие листки)
+        s.rect(sx, 7, sx + 52, 20, WD_D); s.rect(sx + 2, 9, sx + 50, 19, WD_L)
+        for x in range(sx + 4, sx + 48, 12):
+            s.rect(x, 10, x + 9, 18, SH_D); s.rect(x + 1, 12, x + 7, 12, OUT); s.rect(x + 1, 14, x + 5, 14, BORDER)
+        s.rect(sx + 41, 11, sx + 42, 17, BURG); s.rect(sx + 39, 13, sx + 44, 14, BURG)   # выцветший крест
+    for x in (620, 790, 1440, 1580):                     # чугунные батареи с ржавчиной
         s.rect(x, 26, x + 44, 38, M_D)
         for k in range(x + 1, x + 44, 4): s.rect(k, 27, k + 2, 37, M_L)
+        for k in range(x + 3, x + 42, 7): s.rect(k, 30, k, 38, RUST)
+        s.rect(x + 2, 39, x + 42, 39, RUST_D)
     return s
 
 def wall_side():
@@ -203,6 +267,9 @@ def registratura(w=200, h=40, H=14):
     s.rect(30, 16, 46, 23, SH); s.rect(32, 18, 44, 18, SH_D); s.rect(32, 20, 41, 20, SH_D)  # бланки
     s.rect(140, 15, 168, 24, SEAT_D); s.rect(141, 16, 167, 17, SEAT)       # журнал записи
     s.rect(110, 17, 122, 18, OUT)                                          # ручка на верёвочке
+    tw2 = text_width("ОБЕД 13-14"); ox = 12                                 # табличка на стекле (слева от окошка)
+    s.rect(ox - 3, 1, ox + tw2 + 2, 7, SH); s.frame(ox - 3, 1, ox + tw2 + 2, 7, BURG)
+    s.text(ox, 2, "ОБЕД 13-14", BURG)
     tw = text_width("РЕГИСТРАТУРА"); px0 = (w - tw) // 2 - 3
     s.rect(px0, h - H + 3, px0 + tw + 5, h - 4, SH); s.frame(px0, h - H + 3, px0 + tw + 5, h - 4, M_D)
     s.text(px0 + 3, h - H + 5, "РЕГИСТРАТУРА", BORDER)
@@ -322,8 +389,8 @@ def ficus(w=80, h=80, H=16):
     s.frame(14, h - H, w - 15, h - 1, OUT)
     leaves = [(10, 6, 30, 20), (34, 2, 52, 16), (50, 10, 72, 24), (4, 22, 24, 36), (56, 28, 76, 42),
               (22, 18, 42, 32), (40, 20, 58, 34), (26, 36, 44, 48), (44, 38, 60, 50)]
-    for (x0, y0, x1, y1) in leaves:
-        s.ellipse(x0, y0, x1, y1, OUT); s.ellipse(x0 + 1, y0 + 1, x1 - 1, y1 - 1, GR)
+    for k, (x0, y0, x1, y1) in enumerate(leaves):
+        s.ellipse(x0, y0, x1, y1, OUT); s.ellipse(x0 + 1, y0 + 1, x1 - 1, y1 - 1, DRY if k % 3 == 1 else GR)
         s.rect(x0 + 3, (y0 + y1) // 2, x1 - 3, (y0 + y1) // 2, GR_D)
     s.rect(39, 34, 40, 46, WD_D)                                            # ствол
     return pad(s, H)
@@ -389,6 +456,7 @@ LOOKS = {
 
 if __name__ == "__main__":
     floor_tile().save("floor_tile.png"); decal_wear().save("decal_wear.png")
+    decal_stain().save("decal_stain.png"); decal_tear().save("decal_tear.png"); decal_crack().save("decal_crack.png")
     decal_seam().save("decal_seam.png"); decal_mat().save("decal_mat.png")
     wall_north().save("wall_north.png"); wall_side().save("wall_side.png"); wall_bottom().save("wall_bottom.png")
     for key, (fn, (w, h)) in LOOKS.items():

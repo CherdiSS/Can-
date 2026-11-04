@@ -1,12 +1,12 @@
 /* =============================================================
-   Единый стиль «пиксельная районная поликлиника».
+   Единый стиль «мрачная государственная поликлиника» (казённые бланки, облупленная краска).
    Палитра — та же, что у окружения (assets/environment/make_environment.py):
-     --ink        тёмный контур           #1e242c
-     --paper      побелка                 #d6d6c8
-     --paper-sh   тень побелки            #b2b4aa
-     --paint      масляная панель стены   #7aa48c
-     --paint-d    тёмная масляная панель  #5c826e
-     --paint-line полоса-бордюр панели    #3a4844
+     --ink        тёмный контур           #1c1e20
+     --paper      пожелтевший бланк       #c8c2a6
+     --paper-sh   тень бланка             #9e9a84
+     --paint      масляная панель стены   #5f8270
+     --paint-d    тёмная масляная панель  #46624f
+     --paint-line полоса-бордюр панели    #34403a
    Шрифт — пиксельный Tiny5 с кириллицей (assets/fonts/, лицензия OFL).
    У шрифта одно начертание: искусственный жирный отключён, чтобы не размывать пиксели.
    ============================================================= */
@@ -33,12 +33,12 @@
   --base-r: 60px;
   --knob-r: 25px;
 
-  --ink: #1e242c;
-  --paper: #d6d6c8;
-  --paper-sh: #b2b4aa;
-  --paint: #7aa48c;
-  --paint-d: #5c826e;
-  --paint-line: #3a4844;
+  --ink: #1c1e20;
+  --paper: #c8c2a6;
+  --paper-sh: #9e9a84;
+  --paint: #5f8270;
+  --paint-d: #46624f;
+  --paint-line: #34403a;
 
   /* Отступы от выреза камеры и полоски жестов iPhone */
   --safe-l: env(safe-area-inset-left, 0px);
@@ -176,8 +176,8 @@ body.is-game #joystick-base {
 #dodge-button {
   position: absolute;
   box-sizing: border-box;
-  background: rgba(214, 214, 200, 0.72);
-  border: 3px solid rgba(30, 36, 44, 0.85);
+  background: rgba(200, 194, 166, 0.72);
+  border: 3px solid rgba(28, 30, 32, 0.85);
   clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px),
                      calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
   color: var(--ink);
@@ -221,14 +221,14 @@ body.is-game #joystick-base {
 }
 
 #hud-combo-text {
-  color: #b03034;
+  color: #9c2a2e;
   font-size: 15px;
 }
 
 #hud-combo-bar {
   height: 4px;
   margin: 1px auto 0;
-  background: #b03034;
+  background: #9c2a2e;
 }
 
 /* Кнопка паузы 52×52 — справа вверху */
@@ -260,7 +260,7 @@ body.is-game:not(.is-inactive) #dodge-button {
 
 #pause-button:active,
 #dodge-button:active {
-  background: rgba(178, 180, 170, 0.85);
+  background: rgba(158, 154, 132, 0.85);
 }
 
 /* Кнопка уворота — справа внизу, под большой палец.
@@ -293,7 +293,7 @@ body.is-game:not(.is-inactive) #dodge-button {
 }
 
 #dodge-button.is-ready {
-  background: rgba(232, 240, 200, 0.8); /* готов — чуть светлее */
+  background: rgba(222, 214, 180, 0.85); /* готов — чуть светлее */
 }
 
 #game-container canvas {

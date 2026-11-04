@@ -31,6 +31,7 @@ class MenuScene extends Phaser.Scene {
     this.registry.set('missions', Progress.rollMissions());
 
     this.createBackground();
+    this.vignette = createVignette(this, 0); // тёмные края — над полом, под содержимым меню (добавлена раньше него)
 
     // Всё, что создано дальше, попадёт в контейнер с вёрсткой
     const firstContentIndex = this.children.list.length;
@@ -113,7 +114,7 @@ class MenuScene extends Phaser.Scene {
   createMemo(centerX) {
     const C = CONFIG.COLORS;
     const card = this.add.graphics();
-    drawPlate(card, centerX, 215, 620, 340, C.PAPER, C.PAPER_SHADE);
+    drawForm(this, card, centerX, 215, 620, 340);
     createText(this, centerX, 82, 'Левая половина экрана — бег,', 26);
     createText(this, centerX, 116, 'кнопка справа внизу — уворот', 26);
     createText(this, centerX, 166, 'Задания на смену:', 26, C.PAINT_LINE);
@@ -155,9 +156,8 @@ class MenuScene extends Phaser.Scene {
 
     // Затемнение перехватывает нажатия по меню
     const shade = this.add.rectangle(0, 0, CONFIG.MAX_WIDTH * 2, CONFIG.HEIGHT * 2, C.INK, 0.8).setInteractive();
-    const card = this.add.graphics();
-    drawPlate(card, 0, 0, 1200, 680, C.PAPER, C.PAPER_SHADE, 8);
-    items.push(card, createText(this, 0, -290, 'ГАРДЕРОБ', 56));
+    const card = drawForm(this, this.add.graphics(), 0, 0, 1200, 680, '025/у');
+    items.push(card, card.formLabel, createText(this, 0, -290, 'ГАРДЕРОБ', 56));
 
     // Слева — форма: строка = фигурка, название и состояние; нажатие — надеть
     const lx = -280;

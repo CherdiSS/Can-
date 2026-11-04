@@ -225,9 +225,9 @@ def doctor(P=STAND, skin="classic"):
 # ---------------------------------------------------------------- Охотник: шприц
 def hunter(P=STAND):
     s = Spr(64)
-    SKIN, SKIN_SH = c(226, 196, 170), c(176, 140, 128)
-    HAIR, BAG = c(66, 58, 72), c(150, 108, 130)
-    GOWN, GOWN_SH, GOWN_HI = c(132, 188, 214), c(80, 130, 172), c(196, 230, 242)
+    SKIN, SKIN_SH = c(206, 204, 184), c(156, 156, 138)       # бледная, землистая кожа
+    HAIR, BAG = c(58, 56, 60), c(132, 104, 120)
+    GOWN, GOWN_SH, GOWN_HI = c(150, 160, 166), c(104, 114, 124), c(186, 192, 194)   # застиранный серый халат
     WHITE, GREY, DGREY = c(242, 242, 236), c(164, 170, 182), c(98, 104, 118)
     BLOOD, BLOOD_D = c(204, 24, 36), c(122, 10, 22)
     RIM = c(255, 59, 92)          # Охотник: 0xff3b5c
@@ -301,8 +301,8 @@ def hunter(P=STAND):
 # ---------------------------------------------------------------- Перехватчик: капельница
 def interceptor(P=STAND):
     s = Spr(64)
-    SKIN, SKIN_SH = c(196, 206, 172), c(146, 160, 128)      # бледно-зеленоватая кожа
-    GOWN, GOWN_SH, GOWN_HI = c(150, 204, 182), c(92, 150, 132), c(204, 236, 222)
+    SKIN, SKIN_SH = c(188, 198, 170), c(140, 152, 124)      # бледно-зеленоватая кожа
+    GOWN, GOWN_SH, GOWN_HI = c(146, 156, 146), c(100, 112, 104), c(184, 192, 182)   # серо-зелёный халат
     WHITE, SILVER, DGREY = c(242, 242, 236), c(178, 186, 200), c(98, 104, 118)
     BAGC, TUBE = c(214, 228, 236), c(188, 214, 228)
     BLOOD, BLOOD_D, SCAR = c(204, 24, 36), c(122, 10, 22), c(120, 60, 80)
@@ -371,8 +371,8 @@ def interceptor(P=STAND):
 # ---------------------------------------------------------------- Тяжёлый загонщик: бинты и гипс
 def heavy(P=STAND):
     s = Spr(64)
-    SKIN, SKIN_SH = c(222, 176, 146), c(170, 124, 104)
-    GOWN, GOWN_SH, GOWN_HI = c(132, 188, 214), c(80, 130, 172), c(196, 230, 242)
+    SKIN, SKIN_SH = c(206, 190, 170), c(156, 138, 122)
+    GOWN, GOWN_SH, GOWN_HI = c(140, 146, 154), c(96, 102, 112), c(180, 184, 188)   # серый халат
     WHITE, BAND_SH = c(240, 238, 228), c(186, 182, 170)
     EYE, BLOOD = c(255, 214, 72), c(204, 24, 36)
     RIM = c(255, 140, 26)          # Загонщик: 0xff8c1a
@@ -642,21 +642,45 @@ def frames_for(lift, swing, bob, sway):
             idle_cycle(back=True) + run_cycle(lift, swing, bob, sway, back=True))
 
 
-def sheet(draw, lift, swing, bob, sway):
+# «Мрачная поликлиника»: краски блёклые. Каждый пиксель немного обесцвечивается,
+# темнеет и уходит в холодный серо-зелёный; цветной контур роли (rim) не трогаем —
+# по нему пациентов различают в игре.
+GRADE = {  # имя файла: (доля обесцвечивания, яркость)
+    "doctor": (0.12, 0.97),    # героиня — самая заметная фигура на экране
+    "enemy": (0.30, 0.90),
+    "npc": (0.30, 0.90),
+}
+RIMS = {(60, 240, 255), (255, 59, 92), (217, 75, 255), (255, 140, 26), (214, 214, 200)}
+
+def grade(img, desat, bright):
+    p = img.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, a = p[x, y]
+            if a == 0 or (r, g, b) in RIMS:
+                continue
+            l = 0.3 * r + 0.59 * g + 0.11 * b
+            r, g, b = (v + (l - v) * desat for v in (r, g, b))
+            r, g, b = r * bright * 0.97, g * bright, b * bright * 0.98   # чуть в холодный зелёный
+            p[x, y] = (int(min(255, r)), int(min(255, g)), int(min(255, b)), a)
+    return img
+
+def sheet(draw, lift, swing, bob, sway, kind="enemy"):
     poses = frames_for(lift, swing, bob, sway)
     out = Image.new("RGBA", (64 * len(poses), 64), T)
     for i, P in enumerate(poses):
         out.paste(draw(P).im, (64 * i, 0))
-    return out
+    return grade(out, *GRADE[kind])
 
 
 if __name__ == "__main__":
     for name, (draw, lift, swing, bob, sway) in CHARACTERS.items():
-        sheet(draw, lift, swing, bob, sway).save(os.path.join(OUTDIR, name))
+        kind = name.split("_")[0]
+        sheet(draw, lift, swing, bob, sway, kind).save(os.path.join(OUTDIR, name))
     # Варианты формы героини (classic — это doctor_sheet.png выше)
     for skin in SKINS:
         if skin != "classic":
-            sheet(lambda P, skin=skin: doctor(P, skin), 3, 2, -1, 0).save(os.path.join(OUTDIR, "doctor_" + skin + "_sheet.png"))
+            sheet(lambda P, skin=skin: doctor(P, skin), 3, 2, -1, 0, "doctor").save(os.path.join(OUTDIR, "doctor_" + skin + "_sheet.png"))
     bonus().save("bonus_pill.png")
     for name, colors in PILLS.items():
         capsule(*colors).save(name)

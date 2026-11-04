@@ -53,6 +53,7 @@ class GameScene extends Phaser.Scene {
 
     this.createArena();
     this.createObstacles();
+    this.createLighting();
     this.createPlayer();
     this.createChasers();
     this.createBonus();
@@ -102,6 +103,7 @@ class GameScene extends Phaser.Scene {
       this.scoredTime += dt;
     }
 
+    this.lighting.update(dt, (x, y) => this.onLampFlicker(x, y));
     this.updateSpawns();
     this.updateDoors(dt);
     this.updateNpcs(dt);
@@ -180,6 +182,10 @@ class GameScene extends Phaser.Scene {
     });
     env.WEAR.forEach(([x, y]) => this.add.image(x, y, 'env-decal_wear').setOrigin(0).setDepth(0));
     this.add.image(env.MAT.x, env.MAT.y, 'env-decal_mat').setOrigin(0).setDepth(0);
+    // Пятна, дыры в линолеуме и трещины
+    env.STAINS.forEach(([x, y]) => this.add.image(x, y, 'env-decal_stain').setOrigin(0).setDepth(0));
+    env.TEARS.forEach(([x, y]) => this.add.image(x, y, 'env-decal_tear').setOrigin(0).setDepth(0));
+    env.CRACKS.forEach(([x, y]) => this.add.image(x, y, 'env-decal_crack').setOrigin(0).setDepth(0));
 
     // Стены: фасад северной (двери кабинетов), тонкая кромка боковых и южной.
     // Это только картинка: граница мира не менялась.
@@ -190,6 +196,21 @@ class GameScene extends Phaser.Scene {
       .setOrigin(0).setFlipX(true).setDepth(2).setOrigin(1, 0);
     this.add.tileSprite(0, height - env.WALL_BOTTOM_HEIGHT, width, env.WALL_BOTTOM_HEIGHT, 'env-wall_bottom')
       .setOrigin(0).setDepth(2);
+  }
+
+  // Лампы дневного света: светлые пятна, полумрак между ними, мигание, виньетка по краям экрана
+  createLighting() {
+    const L = CONFIG.LIGHTING;
+    this.lighting = new Lighting(this, CONFIG.ARENA.WIDTH, CONFIG.ARENA.HEIGHT, L.LAMPS, { flickering: L.FLICKERING });
+    this.vignette = createVignette(this, 49);
+  }
+
+  // Лампа замигала — тихий треск, если она рядом с героиней
+  onLampFlicker(x, y) {
+    const volume = this.soundVolumeAt(x, y);
+    if (volume > 0.25) {
+      Sound.play('flicker', { volume: volume });
+    }
   }
 
   // Камера занимает весь экран игры и следует за игроком, не выходя за края поля
