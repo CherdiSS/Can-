@@ -77,3 +77,13 @@ function blockBrowserGestures() {
 }
 
 blockBrowserGestures();
+
+// Работа без интернета: регистрируем service worker (sw.js в корне сайта).
+// При открытии через file:// или в старом браузере просто пропускаем
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // не получилось — игра всё равно работает, просто только с интернетом
+    });
+  });
+}

@@ -42,8 +42,9 @@
   <!-- Подсказка для горизонтальной ориентации телефона -->
   <div id="rotate-notice">Поверните телефон вертикально</div>
 
-  <!-- Phaser 3 подключаем через CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <!-- Phaser 3.80.1 лежит в репозитории (js/lib), а не на CDN — так игра работает без интернета.
+       Лицензия Phaser — js/lib/PHASER-LICENSE.md -->
+  <script src="js/lib/phaser.min.js"></script>
 
   <!-- Порядок важен: сначала настройки и утилиты, затем объекты, сцены и запуск -->
   <script src="js/config.js"></script>

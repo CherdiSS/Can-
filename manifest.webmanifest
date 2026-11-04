@@ -3,6 +3,7 @@
   "short_name": "СПИДозный ЦГБ",
   "description": "Аркадная погоня в районной поликлинике",
   "lang": "ru",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
