@@ -64,13 +64,13 @@ class GameScene extends Phaser.Scene {
     this.createEffectsHud();
     this.doorGraphics = this.add.graphics().setDepth(3); // мигание дверей и лампочки «занято»
 
-    // Уворот: кнопка в панели, на компьютере — пробел или Shift
+    // Уворот: кнопка справа внизу, на компьютере — пробел или Shift
     Hud.onDodge = () => this.tryDodge();
 
-    // Высота экрана игры меняется (поворот, панели браузера) — подгоняем камеру
+    // Ширина экрана игры меняется (поворот, панели браузера) — подгоняем камеру
     this.scale.on('resize', this.onResize, this);
 
-    // Фиксированный джойстик в нижней панели (js/utils/joystick.js)
+    // Плавающий джойстик поверх игры (js/utils/joystick.js)
     Joystick.setEnabled(true);
 
     // Звуки рывков пациентов (громче, если рядом)
@@ -195,15 +195,15 @@ class GameScene extends Phaser.Scene {
   // Камера занимает весь экран игры и следует за игроком, не выходя за края поля
   setupCamera() {
     const camera = this.cameras.main;
-    camera.setViewport(0, 0, CONFIG.WIDTH, this.scale.height);
+    camera.setViewport(0, 0, this.scale.width, this.scale.height);
     camera.setBounds(0, 0, CONFIG.ARENA.WIDTH, CONFIG.ARENA.HEIGHT);
     // Без запаздывания: остановилась героиня — сразу стоит и экран
     camera.startFollow(this.player, true, CONFIG.PLAYER.CAMERA_LERP, CONFIG.PLAYER.CAMERA_LERP);
   }
 
   onResize() {
-    this.cameras.main.setSize(CONFIG.WIDTH, this.scale.height);
-    this.startHint.setY(this.getStartHintY());
+    this.cameras.main.setSize(this.scale.width, this.scale.height);
+    this.startHint.setPosition(this.scale.width / 2, this.getStartHintY());
   }
 
   createObstacles() {
@@ -352,18 +352,18 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  // Над игроком в начале игры (координаты экрана, не мира)
+  // Внизу по центру, между джойстиком и кнопкой уворота (координаты экрана, не мира)
   getStartHintY() {
-    return this.scale.height - 300;
+    return this.scale.height - 70;
   }
 
   createStartHint() {
     this.startHint = createText(
       this,
-      CONFIG.WIDTH / 2,
+      this.scale.width / 2,
       this.getStartHintY(),
-      'Управляй джойстиком внизу экрана',
-      32,
+      'Коснись левой половины экрана и веди пальцем',
+      28,
       CONFIG.COLORS.PAPER
     ).setBackgroundColor(colorToCss(CONFIG.COLORS.INK)).setPadding(18, 8, 18, 10) // тёмная плашка — читается на любом полу
       .setDepth(50).setScrollFactor(0); // не уезжает вместе с камерой

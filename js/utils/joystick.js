@@ -1,11 +1,13 @@
 // =============================================================
-// Фиксированный джойстик в нижней панели управления.
-// Это обычные HTML-элементы под canvas, а не объекты Phaser:
-// панель занимает собственное место на экране и не перекрывает арену.
+// Плавающий полупрозрачный джойстик поверх игры.
+// Это обычные HTML-элементы над canvas, а не объекты Phaser.
 //
-// Все расчёты — в CSS-пикселях: центр и радиус берутся из реального
-// размера базы на экране (getBoundingClientRect), поэтому масштаб canvas
-// на управление не влияет. Наружу отдаётся только вектор x, y длиной 0..1.
+// Палец коснулся левой половины экрана — там появляется база джойстика,
+// и дальше направление считается от этой точки. Отпустил — база
+// возвращается бледной подсказкой в левый нижний угол.
+//
+// Все расчёты — в CSS-пикселях, поэтому масштаб canvas на управление не влияет.
+// Наружу отдаётся только вектор x, y длиной 0..1.
 //
 // Обработчики вешаются один раз при загрузке страницы (Joystick.init),
 // поэтому после рестарта сцены дубликатов не появляется.
@@ -14,29 +16,30 @@
 const Joystick = {
   x: 0,              // вектор движения (длина 0..1)
   y: 0,
-  pointerId: null,   // палец, который начал касание на базе и держит джойстик
+  pointerId: null,   // палец, который держит джойстик
   enabled: false,    // джойстик показан (идёт игровая сцена)
   active: false,     // джойстик принимает ввод (не пауза и не поражение)
-  center: null,      // { cx, cy, r } базы в CSS-пикселях
-  onLayoutChange: null, // вызывается после изменения размеров панели (подгонка игры, main.js)
+  center: null,      // { cx, cy, r } базы в CSS-пикселях (координаты окна)
+  radius: 60,        // текущий радиус базы
+  onLayoutChange: null, // вызывается после изменения размеров окна (подгонка игры, main.js)
 
-  panel: null,
+  zone: null,
   base: null,
   knob: null,
 
   init() {
-    this.panel = document.getElementById('control-panel');
+    this.zone = document.getElementById('joystick-zone');
     this.base = document.getElementById('joystick-base');
     this.knob = document.getElementById('joystick-knob');
 
-    // Касание начинается только на базе джойстика
-    this.base.addEventListener('pointerdown', (event) => this.onPointerDown(event));
+    // Касание в любом месте зоны (левая половина экрана)
+    this.zone.addEventListener('pointerdown', (event) => this.onPointerDown(event));
 
-    // Движение и отпускание слушаем на всём окне: палец может уйти за пределы базы
+    // Движение и отпускание слушаем на всём окне: палец может уйти за пределы зоны
     window.addEventListener('pointermove', (event) => this.onPointerMove(event));
     window.addEventListener('pointerup', (event) => this.onPointerEnd(event));
     window.addEventListener('pointercancel', (event) => this.onPointerEnd(event));
-    this.base.addEventListener('lostpointercapture', (event) => this.onPointerEnd(event));
+    this.zone.addEventListener('lostpointercapture', (event) => this.onPointerEnd(event));
 
     // Потеря фокуса / сворачивание — сразу отпускаем джойстик
     window.addEventListener('blur', () => this.reset());
@@ -46,7 +49,7 @@ const Joystick = {
       }
     });
 
-    // Пересчёт компоновки при изменении размера окна и ориентации
+    // Пересчёт размеров при изменении окна и ориентации
     window.addEventListener('resize', () => this.updateLayout());
     window.addEventListener('orientationchange', () => this.updateLayout());
     if (window.visualViewport) {
@@ -56,39 +59,46 @@ const Joystick = {
     this.updateLayout();
   },
 
-  // Высота панели и размеры джойстика под текущий экран (в CSS-пикселях)
+  // Размер джойстика под текущий экран (в CSS-пикселях)
   updateLayout() {
     const J = CONFIG.JOYSTICK;
     const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
 
-    // На маленьких экранах панель уменьшается, чтобы арена оставалась удобной
-    const panelHeight = Math.round(Math.min(J.PANEL_HEIGHT, viewportHeight * J.PANEL_MAX_SHARE));
-    const baseRadius = Math.round(Math.min(J.BASE_RADIUS, panelHeight * J.BASE_TO_PANEL));
-    const knobRadius = Math.round(baseRadius * J.KNOB_RADIUS / J.BASE_RADIUS);
+    // На низком экране (телефон горизонтально) джойстик чуть меньше
+    this.radius = Math.round(Math.max(40, Math.min(J.BASE_RADIUS, viewportHeight * J.MAX_TO_HEIGHT)));
+    const knobRadius = Math.round(this.radius * J.KNOB_RADIUS / J.BASE_RADIUS);
 
     const root = document.documentElement.style;
-    root.setProperty('--panel-h', panelHeight + 'px');
-    root.setProperty('--base-r', baseRadius + 'px');
+    root.setProperty('--base-r', this.radius + 'px');
     root.setProperty('--knob-r', knobRadius + 'px');
 
-    // Если палец держит джойстик — обновляем центр базы
-    if (this.pointerId !== null) {
-      this.center = this.measureBase();
+    if (this.pointerId === null) {
+      this.placeAtRest();
     }
 
-    // Контейнер игры поменял размер — подгоняем игру (функцию задаёт main.js)
+    // Окно поменяло размер — подгоняем игру (функцию задаёт main.js)
     if (this.onLayoutChange) {
       requestAnimationFrame(this.onLayoutChange);
     }
   },
 
-  measureBase() {
-    const rect = this.base.getBoundingClientRect();
-    return {
-      cx: rect.left + rect.width / 2,
-      cy: rect.top + rect.height / 2,
-      r: rect.width / 2
-    };
+  // Положение-подсказка: левый нижний угол зоны
+  placeAtRest() {
+    const rect = this.zone.getBoundingClientRect();
+    const r = this.radius;
+    this.placeBase(rect.left + r * 2 + 24, rect.bottom - r * 2 - 10);
+  },
+
+  // Поставить центр базы в точку окна (cx, cy); база целиком остаётся на экране
+  placeBase(cx, cy) {
+    const zone = this.zone.getBoundingClientRect();
+    const r = this.radius;
+    const m = CONFIG.JOYSTICK.EDGE_MARGIN;
+    const x = Phaser.Math.Clamp(cx, zone.left + r + m, Math.max(zone.left + r + m, window.innerWidth - r - m));
+    const y = Phaser.Math.Clamp(cy, zone.top + r + m, Math.max(zone.top + r + m, zone.bottom - r - m));
+    this.base.style.left = (x - zone.left) + 'px';
+    this.base.style.top = (y - zone.top) + 'px';
+    return { cx: x, cy: y, r: r };
   },
 
   onPointerDown(event) {
@@ -96,18 +106,12 @@ const Joystick = {
     if (!this.active || this.pointerId !== null) {
       return;
     }
-
-    // Захватываем управление только касанием внутри круга базы
-    const center = this.measureBase();
-    if (Math.hypot(event.clientX - center.cx, event.clientY - center.cy) > center.r) {
-      return;
-    }
-
     event.preventDefault();
     this.pointerId = event.pointerId;
-    this.center = center;
+    // База — под пальцем (у самого края экрана чуть сдвигается внутрь)
+    this.center = this.placeBase(event.clientX, event.clientY);
     try {
-      this.base.setPointerCapture(event.pointerId);
+      this.zone.setPointerCapture(event.pointerId);
     } catch (error) {
       // Без захвата тоже работает: move/up слушаются на window
     }
@@ -129,7 +133,7 @@ const Joystick = {
     this.reset();
   },
 
-  // Вектор и положение ручки относительно НЕПОДВИЖНОГО центра базы
+  // Вектор и положение ручки относительно центра базы
   updateFromPointer(px, py) {
     const { cx, cy, r } = this.center;
     const dx = px - cx;
@@ -169,12 +173,12 @@ const Joystick = {
     this.knob.style.transform = 'translate(' + knobX + 'px, ' + knobY + 'px)';
   },
 
-  // Отпустить джойстик: ручка в центр, движение прекращается
+  // Отпустить джойстик: ручка в центр, база — на место подсказки, движение прекращается
   reset() {
-    if (this.pointerId !== null && this.base.hasPointerCapture &&
-        this.base.hasPointerCapture(this.pointerId)) {
+    if (this.pointerId !== null && this.zone.hasPointerCapture &&
+        this.zone.hasPointerCapture(this.pointerId)) {
       try {
-        this.base.releasePointerCapture(this.pointerId);
+        this.zone.releasePointerCapture(this.pointerId);
       } catch (error) {
         // ничего страшного
       }
@@ -188,14 +192,14 @@ const Joystick = {
     }
     if (this.base) {
       this.base.classList.remove('is-held');
+      this.placeAtRest();
     }
   },
 
-  // Показать/спрятать джойстик (игровая сцена запущена или нет)
+  // Показать/спрятать джойстик и кнопки (игровая сцена запущена или нет)
   setEnabled(enabled) {
     this.enabled = enabled;
-    this.panel.classList.toggle('is-game', enabled);
-    document.body.classList.toggle('is-game', enabled); // для кнопки паузы на поле
+    document.body.classList.toggle('is-game', enabled);
     this.setActive(enabled);
   },
 
@@ -205,7 +209,6 @@ const Joystick = {
     if (!active) {
       this.reset();
     }
-    this.panel.classList.toggle('is-inactive', !active);
     document.body.classList.toggle('is-inactive', !active);
   },
 

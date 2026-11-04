@@ -9,7 +9,7 @@
 // Добавил новый файл (спрайт, скрипт)? Допиши его в FILES и увеличь VERSION.
 // =============================================================
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE_NAME = 'cgb-' + VERSION;
 const NETWORK_TIMEOUT = 3000; // мс
 

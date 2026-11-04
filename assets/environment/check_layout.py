@@ -61,6 +61,5 @@ def check(obst, label):
     return seen, free, step
 
 if __name__ == "__main__":
-    check(OLD, "старая раскладка (14)")
     cfg = load_config_obstacles()
     check(cfg, "js/config.js")

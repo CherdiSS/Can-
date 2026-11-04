@@ -2,15 +2,20 @@
 // MenuScene — главное меню: название, задания на смену, рекорд,
 // кнопка «ИГРАТЬ», звук и гардероб (форма героини и штампы).
 // Фон — стена и пол поликлиники (во весь экран, пиксели ×2).
-// Содержимое свёрстано в координатах 720×1280 и лежит в контейнере, который
-// центрируется и уменьшается, если экран игры ниже расчётного.
+// Экран горизонтальный: слева — название и персонажи, справа — памятка и кнопки.
+// Содержимое свёрстано в координатах 1280×720 и лежит в контейнере, который
+// центрируется и уменьшается, если экран игры меньше расчётного.
 // =============================================================
 
 // Вертикальный центр и высота содержимого меню (в координатах вёрстки)
-const MENU_CENTER_Y = 712;
-const MENU_BLOCK_HEIGHT = 1180;
+const MENU_CENTER_Y = 360;
+const MENU_BLOCK_WIDTH = 1250;
+const MENU_BLOCK_HEIGHT = 700;
+const MENU_LEFT_X = 330;   // центр левой колонки
+const MENU_RIGHT_X = 930;  // центр правой колонки
 const MENU_PIXEL_SCALE = 2; // пиксель-арт в меню — ровно ×2
-const WARDROBE_BLOCK_HEIGHT = 1120;
+const WARDROBE_BLOCK_WIDTH = 1220;
+const WARDROBE_BLOCK_HEIGHT = 700;
 
 class MenuScene extends Phaser.Scene {
   constructor() {
@@ -18,7 +23,7 @@ class MenuScene extends Phaser.Scene {
   }
 
   create() {
-    const centerX = CONFIG.WIDTH / 2;
+    const centerX = CONFIG.WIDTH / 2; // центр вёрстки (контейнер потом ставится в центр экрана)
     this.cameras.main.setBackgroundColor(CONFIG.COLORS.BACKGROUND);
     this.wardrobe = null;
 
@@ -29,27 +34,27 @@ class MenuScene extends Phaser.Scene {
 
     // Всё, что создано дальше, попадёт в контейнер с вёрсткой
     const firstContentIndex = this.children.list.length;
-    this.createTitle(centerX);
-    this.createIllustration(centerX);
-    this.createMemo(centerX);
+    this.createTitle(MENU_LEFT_X);
+    this.createIllustration(MENU_LEFT_X);
+    this.createMemo(MENU_RIGHT_X);
 
     // Главная кнопка — зелёная, как масляная панель стены
-    createButton(this, centerX, 1045, 'ИГРАТЬ', () => this.startGame(), {
-      width: 480,
-      height: 150,
-      fontSize: 64,
+    createButton(this, MENU_RIGHT_X, 480, 'ИГРАТЬ', () => this.startGame(), {
+      width: 460,
+      height: 130,
+      fontSize: 60,
       primary: true
     });
 
     // Гардероб и звук (настройка звука запоминается)
-    createButton(this, centerX - 150, 1180, 'ГАРДЕРОБ', () => this.openWardrobe(), { width: 280, height: 96, fontSize: 34 });
-    this.soundButton = createButton(this, centerX + 150, 1180, '', () => {
+    createButton(this, MENU_RIGHT_X - 125, 625, 'ГАРДЕРОБ', () => this.openWardrobe(), { width: 240, height: 96, fontSize: 32 });
+    this.soundButton = createButton(this, MENU_RIGHT_X + 125, 625, '', () => {
       Sound.setMuted(!Sound.muted);
       this.updateSoundLabel();
-    }, { width: 280, height: 96, fontSize: 34 });
+    }, { width: 240, height: 96, fontSize: 30 });
     this.updateSoundLabel();
 
-    this.createHomeScreenHint(centerX);
+    this.createHomeScreenHint(MENU_LEFT_X);
 
     // Собираем содержимое в контейнер: координаты — относительно центра содержимого
     const items = this.children.list.slice(firstContentIndex);
@@ -75,16 +80,16 @@ class MenuScene extends Phaser.Scene {
 
   // Пол поликлиники на весь экран и стена с дверями кабинетов сверху
   createBackground() {
-    this.floor = this.add.tileSprite(0, 0, CONFIG.WIDTH, this.scale.height, 'env-floor_tile')
+    this.floor = this.add.tileSprite(0, 0, this.scale.width, this.scale.height, 'env-floor_tile')
       .setOrigin(0).setTileScale(MENU_PIXEL_SCALE);
-    this.add.image(CONFIG.WIDTH / 2, 0, 'env-wall_north').setOrigin(0.5, 0).setScale(MENU_PIXEL_SCALE);
+    this.wall = this.add.image(this.scale.width / 2, 0, 'env-wall_north').setOrigin(0.5, 0).setScale(MENU_PIXEL_SCALE);
   }
 
   // Название — на табличке, как на дверях кабинетов
   createTitle(centerX) {
     const plate = this.add.graphics();
-    drawPlate(plate, centerX, 245, 600, 230, CONFIG.COLORS.PAPER, CONFIG.COLORS.PAPER_SHADE, 8);
-    createText(this, centerX, 238, 'СПИДозный\nЦГБ', 92, CONFIG.COLORS.INK, { lineSpacing: -8 });
+    drawPlate(plate, centerX, 150, 560, 210, CONFIG.COLORS.PAPER, CONFIG.COLORS.PAPER_SHADE, 8);
+    createText(this, centerX, 143, 'СПИДозный\nЦГБ', 84, CONFIG.COLORS.INK, { lineSpacing: -8 });
   }
 
   // «Картинка» из персонажей игры: героиня-врач, три пациента и таблетка (с анимацией)
@@ -92,7 +97,7 @@ class MenuScene extends Phaser.Scene {
     const scale = MENU_PIXEL_SCALE;
     const ring = CONFIG.CHASER.RING;
     // Загонщик, Охотник, Перехватчик — у каждого пиксельное кольцо цвета роли
-    [[centerX - 165, 525, 2], [centerX, 465, 0], [centerX + 165, 525, 1]].forEach(([x, y, roleIndex]) => {
+    [[centerX - 160, 405, 2], [centerX, 360, 0], [centerX + 160, 405, 1]].forEach(([x, y, roleIndex]) => {
       const role = CONFIG.CHASER.ROLES[roleIndex];
       this.add.image(x, y + ring.OFFSET_Y * scale, 'ui-ring').setScale(scale).setTint(role.color);
       // пациенты бегут на месте, у каждого — своя походка
@@ -100,22 +105,23 @@ class MenuScene extends Phaser.Scene {
     });
     // героиня в выбранной форме дышит
     const skin = Progress.getSkin().texture;
-    this.heroine = this.add.sprite(centerX, 600, skin).setScale(scale).play(skin + '-idle');
-    this.add.image(centerX + 225, 650, CONFIG.BONUS.TEXTURE).setScale(scale);
+    this.heroine = this.add.sprite(centerX, 490, skin).setScale(scale).play(skin + '-idle');
+    this.add.image(centerX + 215, 535, CONFIG.BONUS.TEXTURE).setScale(scale);
   }
 
   // «Памятка»: подсказка, задания на смену и рекорд на карточке-побелке
   createMemo(centerX) {
     const C = CONFIG.COLORS;
     const card = this.add.graphics();
-    drawPlate(card, centerX, 820, 640, 280, C.PAPER, C.PAPER_SHADE);
-    createText(this, centerX, 712, 'Управляй джойстиком внизу экрана', 30);
-    createText(this, centerX, 756, 'Задания на смену:', 26, C.PAINT_LINE);
+    drawPlate(card, centerX, 215, 620, 340, C.PAPER, C.PAPER_SHADE);
+    createText(this, centerX, 82, 'Левая половина экрана — бег,', 26);
+    createText(this, centerX, 116, 'кнопка справа внизу — уворот', 26);
+    createText(this, centerX, 166, 'Задания на смену:', 26, C.PAINT_LINE);
     this.registry.get('missions').forEach((id, i) => {
       const mission = CONFIG.MISSIONS.LIST.find((m) => m.id === id);
-      createText(this, centerX, 792 + i * 32, '- ' + mission.text + ' (+' + CONFIG.MISSIONS.POINTS + ')', 24, C.INK);
+      createText(this, centerX, 202 + i * 32, '- ' + mission.text + ' (+' + CONFIG.MISSIONS.POINTS + ')', 24, C.INK);
     });
-    createText(this, centerX, 912, 'Рекорд: ' + getBestScore(), 38, C.STAMP);
+    createText(this, centerX, 335, 'Рекорд: ' + getBestScore(), 36, C.STAMP);
   }
 
   updateSoundLabel() {
@@ -123,12 +129,14 @@ class MenuScene extends Phaser.Scene {
   }
 
   layout() {
-    const height = this.scale.height;
-    this.cameras.main.setSize(CONFIG.WIDTH, height);
-    this.floor.setSize(CONFIG.WIDTH, height);
-    fitContainer(this.content, height, MENU_BLOCK_HEIGHT);
+    const { width, height } = this.scale;
+    this.cameras.main.setSize(width, height);
+    this.floor.setSize(width, height);
+    this.wall.setX(width / 2);
+    fitContainer(this.content, this.scale, MENU_BLOCK_HEIGHT, MENU_BLOCK_WIDTH);
     if (this.wardrobe) {
-      fitContainer(this.wardrobe.content, height, WARDROBE_BLOCK_HEIGHT);
+      this.wardrobe.shade.setPosition(width / 2, height / 2);
+      fitContainer(this.wardrobe.content, this.scale, WARDROBE_BLOCK_HEIGHT, WARDROBE_BLOCK_WIDTH);
     }
   }
 
@@ -146,23 +154,24 @@ class MenuScene extends Phaser.Scene {
     const items = [];
 
     // Затемнение перехватывает нажатия по меню
-    const shade = this.add.rectangle(CONFIG.WIDTH / 2, 0, CONFIG.WIDTH, CONFIG.MAX_HEIGHT * 2, C.INK, 0.8).setInteractive();
+    const shade = this.add.rectangle(0, 0, CONFIG.MAX_WIDTH * 2, CONFIG.HEIGHT * 2, C.INK, 0.8).setInteractive();
     const card = this.add.graphics();
-    drawPlate(card, 0, 0, 640, 1100, C.PAPER, C.PAPER_SHADE, 8);
-    items.push(card, createText(this, 0, -490, 'ГАРДЕРОБ', 60));
+    drawPlate(card, 0, 0, 1200, 680, C.PAPER, C.PAPER_SHADE, 8);
+    items.push(card, createText(this, 0, -290, 'ГАРДЕРОБ', 56));
 
-    // Форма: строка = фигурка, название и состояние; нажатие — надеть
+    // Слева — форма: строка = фигурка, название и состояние; нажатие — надеть
+    const lx = -280;
     CONFIG.SKINS.forEach((skin, i) => {
-      const y = -390 + i * 104;
+      const y = -195 + i * 96;
       const open = Progress.isUnlocked(skin, data);
       const worn = skin.key === current;
-      const row = this.add.rectangle(0, y, 580, 96, worn ? C.PAINT : C.PAPER_SHADE, worn ? 1 : 0.35);
-      const figure = this.add.sprite(-230, y, skin.texture).play(skin.texture + '-idle');
+      const row = this.add.rectangle(lx, y, 580, 88, worn ? C.PAINT : C.PAPER_SHADE, worn ? 1 : 0.35);
+      const figure = this.add.sprite(lx - 230, y, skin.texture).play(skin.texture + '-idle');
       if (!open) {
         figure.setTintFill(C.PAINT_LINE); // закрыто — тёмный силуэт
       }
-      const name = createText(this, -170, y - 16, skin.name, 32).setOrigin(0, 0.5);
-      const status = createText(this, -170, y + 20, worn ? 'надета' : (open ? 'нажми, чтобы надеть' : 'закрыто: ' + skin.unlock.text),
+      const name = createText(this, lx - 170, y - 16, skin.name, 30).setOrigin(0, 0.5);
+      const status = createText(this, lx - 170, y + 18, worn ? 'надета' : (open ? 'нажми, чтобы надеть' : 'закрыто: ' + skin.unlock.text),
         22, open ? C.PAINT_LINE : C.STAMP).setOrigin(0, 0.5);
       if (open && !worn) {
         row.setInteractive({ useHandCursor: true }).on('pointerup', () => {
@@ -175,15 +184,16 @@ class MenuScene extends Phaser.Scene {
       items.push(row, figure, name, status);
     });
 
-    // Штампы для экрана поражения
-    items.push(createText(this, 0, 145, 'Штампы на экране поражения', 28, C.PAINT_LINE));
+    // Справа — штампы для экрана поражения и статистика
+    const rx = 300;
+    items.push(createText(this, rx, -195, 'Штампы на экране поражения', 28, C.PAINT_LINE));
     CONFIG.STAMPS.forEach((stamp, i) => {
       const open = Progress.isUnlocked(stamp, data);
-      items.push(createText(this, 0, 190 + i * 36, open ? stamp.text : 'закрыто: ' + stamp.unlock.text, 26, open ? C.STAMP : C.PAINT_LINE));
+      items.push(createText(this, rx, -145 + i * 42, open ? stamp.text : 'закрыто: ' + stamp.unlock.text, 26, open ? C.STAMP : C.PAINT_LINE));
     });
-    items.push(createText(this, 0, 355, 'Смен: ' + data.games + '   таблеток: ' + data.totalPills + '   заданий: ' + data.totalMissions, 22, C.PAINT_LINE));
+    items.push(createText(this, rx, 60, 'Смен: ' + data.games + '   таблеток: ' + data.totalPills + '   заданий: ' + data.totalMissions, 22, C.PAINT_LINE));
 
-    const close = createButton(this, 0, 460, 'ГОТОВО', () => this.closeWardrobe(), { width: 320, height: 100, fontSize: 40, primary: true });
+    const close = createButton(this, rx, 210, 'ГОТОВО', () => this.closeWardrobe(), { width: 320, height: 100, fontSize: 40, primary: true });
     const content = this.add.container(0, 0, items.concat(buttonParts(close)));
     this.wardrobe = { shade, content };
     this.layout();
@@ -205,7 +215,7 @@ class MenuScene extends Phaser.Scene {
     const isStandalone = window.navigator.standalone === true ||
       window.matchMedia('(display-mode: standalone)').matches;
     if (isIos && !isStandalone) {
-      createText(this, centerX, 1275, 'На весь экран: «Поделиться» → «На экран „Домой“»', 24, CONFIG.COLORS.PAPER)
+      createText(this, centerX, 650, 'На весь экран:\n«Поделиться» → «На экран „Домой“»', 22, CONFIG.COLORS.PAPER)
         .setBackgroundColor(colorToCss(CONFIG.COLORS.INK)).setPadding(14, 6, 14, 8);
     }
   }

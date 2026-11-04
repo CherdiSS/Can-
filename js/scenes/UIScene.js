@@ -1,14 +1,17 @@
 // =============================================================
 // UIScene — интерфейс поверх GameScene: экран паузы и экран поражения.
-// Счёт, таймер и кнопка паузы — в нижней HTML-панели (js/utils/hud.js).
-// Высота экрана игры меняется (под пропорцию телефона), поэтому содержимое
+// Счёт, время и кнопка паузы — HTML поверх игры (js/utils/hud.js).
+// Ширина экрана игры меняется (под пропорцию телефона), поэтому содержимое
 // оверлеев лежит в контейнерах: они центрируются и при нехватке места уменьшаются.
+// Карточки горизонтальные — под лежащий боком телефон.
 // Состояния: 'playing' → 'paused' → 'countdown' (3-2-1) → 'playing'; 'caught' → 'gameover'.
 // =============================================================
 
-// Высота блоков оверлеев (их координаты — относительно центра экрана)
-const PAUSE_BLOCK_HEIGHT = 820;
-const GAME_OVER_BLOCK_HEIGHT = 1060;
+// Размеры блоков оверлеев (их координаты — относительно центра экрана)
+const PAUSE_BLOCK_WIDTH = 920;
+const PAUSE_BLOCK_HEIGHT = 580;
+const GAME_OVER_BLOCK_WIDTH = 1120;
+const GAME_OVER_BLOCK_HEIGHT = 640;
 
 class UIScene extends Phaser.Scene {
   constructor() {
@@ -56,21 +59,23 @@ class UIScene extends Phaser.Scene {
 
   // Подгонка под текущую высоту экрана игры
   layout() {
-    const height = this.scale.height;
-    this.cameras.main.setSize(CONFIG.WIDTH, height);
-    fitContainer(this.pauseContent, height, PAUSE_BLOCK_HEIGHT);
-    this.countdownContent.setPosition(CONFIG.WIDTH / 2, height / 2);
-    fitContainer(this.gameOverContent, height, GAME_OVER_BLOCK_HEIGHT);
+    const { width, height } = this.scale;
+    this.cameras.main.setSize(width, height);
+    this.pauseShade.setPosition(width / 2, height / 2);
+    this.gameOverShade.setPosition(width / 2, height / 2);
+    fitContainer(this.pauseContent, this.scale, PAUSE_BLOCK_HEIGHT, PAUSE_BLOCK_WIDTH);
+    this.countdownContent.setPosition(width / 2, height / 2);
+    fitContainer(this.gameOverContent, this.scale, GAME_OVER_BLOCK_HEIGHT, GAME_OVER_BLOCK_WIDTH);
   }
 
   updateHud(score, seconds) {
     Hud.update(score, seconds);
   }
 
-  // Затемнение с запасом по высоте — закрывает экран при любой его высоте
-  // и перехватывает нажатия, чтобы они не доходили до игры
+  // Затемнение с запасом — закрывает экран при любой его ширине
+  // и перехватывает нажатия, чтобы они не доходили до игры (ставится в центр в layout)
   createShade(alpha) {
-    return this.add.rectangle(CONFIG.WIDTH / 2, 0, CONFIG.WIDTH, CONFIG.MAX_HEIGHT * 2, CONFIG.COLORS.INK, alpha)
+    return this.add.rectangle(0, 0, CONFIG.MAX_WIDTH * 2, CONFIG.HEIGHT * 2, CONFIG.COLORS.INK, alpha)
       .setInteractive();
   }
 
@@ -87,15 +92,16 @@ class UIScene extends Phaser.Scene {
 
   createPauseOverlay() {
     const shade = this.createShade(0.7);
+    this.pauseShade = shade;
 
     // Координаты — относительно центра экрана (контейнер ставится в центр)
-    const card = this.createCard(600, 800);
-    const title = createText(this, 0, -320, 'ПАУЗА', 84);
+    const card = this.createCard(900, 560);
+    const title = createText(this, 0, -205, 'ПАУЗА', 72);
     // Задания на смену с прогрессом (обновляются при каждой паузе)
-    this.pauseMissionTexts = [0, 1, 2].map((i) => createText(this, 0, -225 + i * 40, '', 26, CONFIG.COLORS.PAINT_LINE));
-    const resumeButton = createButton(this, 0, -35, 'ПРОДОЛЖИТЬ', () => this.resumeGame(), { primary: true });
-    const menuButton = createButton(this, 0, 110, 'В МЕНЮ', () => this.goToMenu(), { height: 112, fontSize: 44 });
-    this.soundButton = createButton(this, 0, 240, '', () => this.toggleSound(), { height: 100, fontSize: 38 });
+    this.pauseMissionTexts = [0, 1, 2].map((i) => createText(this, 0, -132 + i * 36, '', 26, CONFIG.COLORS.PAINT_LINE));
+    const resumeButton = createButton(this, 0, 45, 'ПРОДОЛЖИТЬ', () => this.resumeGame(), { primary: true, height: 120 });
+    const menuButton = createButton(this, -170, 190, 'В МЕНЮ', () => this.goToMenu(), { width: 300, height: 96, fontSize: 40 });
+    this.soundButton = createButton(this, 170, 190, '', () => this.toggleSound(), { width: 300, height: 96, fontSize: 34 });
     this.updateSoundLabel();
 
     this.pauseContent = this.add.container(0, 0, [card, title].concat(this.pauseMissionTexts,
@@ -220,36 +226,39 @@ class UIScene extends Phaser.Scene {
   createGameOverOverlay() {
     const C = CONFIG.COLORS;
     const shade = this.createShade(0.8);
-    const card = this.createCard(640, 1040);
+    this.gameOverShade = shade;
+    const card = this.createCard(1100, 620);
+    const lx = -270; // левая колонка: штамп и итог
+    const rx = 270;  // правая: рекорд, задания, открытия и кнопки
 
     // Штамп — красная надпись в рамке (текст — случайный из открытых, см. гардероб)
-    const stamp = this.add.graphics({ x: 0, y: -405 });
+    const stamp = this.add.graphics({ x: lx, y: -195 });
     stamp.fillStyle(C.STAMP, 1);
     stamp.fillRect(-250, -62, 500, 8);
     stamp.fillRect(-250, 54, 500, 8);
     stamp.fillRect(-250, -62, 8, 124);
     stamp.fillRect(242, -62, 8, 124);
-    this.stampText = createText(this, 0, -409, 'ПОЙМАН!', 88, C.STAMP);
+    this.stampText = createText(this, lx, -199, 'ПОЙМАН!', 88, C.STAMP);
 
-    const scoreLabel = createText(this, 0, -300, 'Счёт', 32, C.PAINT_LINE);
-    this.finalScoreText = createText(this, 0, -245, '0', 90);
-    this.finalTimeText = createText(this, 0, -175, '', 36, C.PAINT_LINE);
-    this.diagnosisText = createText(this, 0, -127, '', 32, C.INK);
-    this.newRecordText = createText(this, 0, -76, 'Новый рекорд!', 44, C.STAMP);
-    this.bestScoreText = createText(this, 0, -32, '', 28, C.PAINT_LINE);
-    this.missionsText = createText(this, 0, 12, '', 28, C.PAINT_DARK);
-    this.unlockText = createText(this, 0, 62, '', 26, C.STAMP, { lineSpacing: 2 });
+    const scoreLabel = createText(this, lx, -90, 'Счёт', 32, C.PAINT_LINE);
+    this.finalScoreText = createText(this, lx, -35, '0', 90);
+    this.finalTimeText = createText(this, lx, 35, '', 36, C.PAINT_LINE);
+    this.diagnosisText = createText(this, lx, 88, '', 32, C.INK);
+    this.newRecordText = createText(this, lx, 155, 'Новый рекорд!', 44, C.STAMP);
+    this.bestScoreText = createText(this, rx, -235, '', 30, C.PAINT_LINE);
+    this.missionsText = createText(this, rx, -190, '', 30, C.PAINT_DARK);
+    this.unlockText = createText(this, rx, -105, '', 26, C.STAMP, { lineSpacing: 2 });
 
-    const restartButton = createButton(this, 0, 222, 'ИГРАТЬ СНОВА', () => this.restartGame(), {
-      width: 500,
-      height: 130,
-      fontSize: 52,
+    const restartButton = createButton(this, rx, 90, 'ИГРАТЬ СНОВА', () => this.restartGame(), {
+      width: 460,
+      height: 120,
+      fontSize: 50,
       primary: true
     });
-    const menuButton = createButton(this, 0, 360, 'В МЕНЮ', () => this.goToMenu(), {
-      width: 380,
-      height: 104,
-      fontSize: 44
+    const menuButton = createButton(this, rx, 220, 'В МЕНЮ', () => this.goToMenu(), {
+      width: 340,
+      height: 96,
+      fontSize: 42
     });
 
     this.gameOverContent = this.add.container(0, 0, [

@@ -130,25 +130,30 @@ def decal_mat():
     for y in range(10, 48, 6): s.rect(8, y, 103, y, OUT)
     return s
 
-def wall_north(width=1080):
-    """Северная стена целиком: побелка сверху, масляная панель снизу, двери кабинетов, стенд, батарея."""
+# Центры дверей кабинетов 101–106 — те же, что CONFIG.DOORS.LIST в js/config.js
+DOOR_CENTERS = (160, 520, 900, 1340, 1720, 2080)
+
+def wall_north(width=2240):
+    """Северная стена целиком: побелка сверху, масляная панель снизу, двери кабинетов, стенды, батареи."""
     h = 44; s = Img(width, h)
     s.rect(0, 0, width - 1, 3, WW_SH); s.rect(0, 3, width - 1, 3, OUT)
     s.rect(0, 4, width - 1, 21, WW)
     s.rect(0, 22, width - 1, 23, BORDER)                 # бордюр между побелкой и панелью
     s.rect(0, 24, width - 1, 39, PANEL); s.rect(0, 36, width - 1, 39, PANEL_D)
     s.rect(0, 40, width - 1, 43, BORDER); s.rect(0, 40, width - 1, 40, OUT)   # плинтус
-    for i, x in enumerate((90, 410, 650, 970)):          # двери кабинетов 101–104
+    for i, cx in enumerate(DOOR_CENTERS):                # двери кабинетов 101–106
+        x = cx - 15
         s.rect(x - 2, 6, x + 31, 43, WD_D)
         s.rect(x, 8, x + 29, 43, WD); s.rect(x + 14, 8, x + 15, 43, WD_D)
         s.rect(x + 24, 26, x + 26, 27, M_L)
         s.rect(x + 6, 11, x + 23, 18, SH); s.frame(x + 6, 11, x + 23, 18, M_D)
         s.text(x + 9, 12, str(101 + i), BORDER)
-    s.rect(230, 7, 300, 20, WD_D); s.rect(232, 9, 298, 19, WD_L)   # информационный стенд
-    for k, x in enumerate(range(236, 296, 15)):
-        s.rect(x, 10, x + 11, 18, SH); s.rect(x + 2, 12, x + 9, 12, SH_D); s.rect(x + 2, 14, x + 7, 14, SH_D)
-    s.rect(281, 11, 283, 17, GR); s.rect(279, 13, 285, 15, GR)     # зелёный крест-пиктограмма
-    for x in (760, 860):                                            # чугунные батареи
+    for sx in (300, 1100, 1900):                         # информационные стенды
+        s.rect(sx, 7, sx + 70, 20, WD_D); s.rect(sx + 2, 9, sx + 68, 19, WD_L)
+        for x in range(sx + 6, sx + 66, 15):
+            s.rect(x, 10, x + 11, 18, SH); s.rect(x + 2, 12, x + 9, 12, SH_D); s.rect(x + 2, 14, x + 7, 14, SH_D)
+        s.rect(sx + 51, 11, sx + 53, 17, GR); s.rect(sx + 49, 13, sx + 55, 15, GR)   # зелёный крест
+    for x in (660, 760, 1480, 1560):                     # чугунные батареи
         s.rect(x, 26, x + 44, 38, M_D)
         for k in range(x + 1, x + 44, 4): s.rect(k, 27, k + 2, 37, M_L)
     return s

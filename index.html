@@ -18,29 +18,29 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- Сюда Phaser вставит canvas с игрой (арена). Кнопка паузы — в правом верхнем углу поля -->
-  <div id="game-container">
-    <button id="pause-button" class="hud" type="button" aria-label="Пауза"><span></span><span></span></button>
-  </div>
+  <!-- Сюда Phaser вставит canvas с игрой (весь экран, игра горизонтальная) -->
+  <div id="game-container"></div>
 
-  <!-- Нижняя панель управления: своё место на экране, не поверх арены.
-       Слева — счёт и таймер, по центру — джойстик, справа — пауза. -->
-  <div id="control-panel">
-    <div id="hud-left" class="hud">
+  <!-- Управление поверх игры: полупрозрачные HTML-элементы.
+       Левая половина экрана — зона плавающего джойстика, справа внизу — уворот,
+       сверху по центру — счёт и время, справа вверху — пауза. -->
+  <div id="controls">
+    <div id="joystick-zone">
+      <div id="joystick-base">
+        <div id="joystick-knob"></div>
+      </div>
+    </div>
+    <div id="hud-top" class="hud">
       <div id="hud-score">0</div>
       <div id="hud-time">0:00</div>
       <div id="hud-combo"><span id="hud-combo-text"></span><div id="hud-combo-bar"></div></div>
     </div>
-    <div id="joystick-base">
-      <div id="joystick-knob"></div>
-    </div>
-    <div id="hud-right" class="hud">
-      <button id="dodge-button" type="button" aria-label="Уворот"><span id="dodge-label">УВОРОТ</span><div id="dodge-cooldown"></div></button>
-    </div>
+    <button id="pause-button" class="hud" type="button" aria-label="Пауза"><span></span><span></span></button>
+    <button id="dodge-button" class="hud" type="button" aria-label="Уворот"><span id="dodge-label">УВОРОТ</span><div id="dodge-cooldown"></div></button>
   </div>
 
-  <!-- Подсказка для горизонтальной ориентации телефона -->
-  <div id="rotate-notice">Поверните телефон вертикально</div>
+  <!-- Подсказка для вертикальной ориентации телефона -->
+  <div id="rotate-notice">Поверните телефон горизонтально</div>
 
   <!-- Phaser 3.80.1 лежит в репозитории (js/lib), а не на CDN — так игра работает без интернета.
        Лицензия Phaser — js/lib/PHASER-LICENSE.md -->
