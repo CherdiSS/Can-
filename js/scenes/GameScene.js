@@ -24,7 +24,7 @@ class GameScene extends Phaser.Scene {
     this.lastPillTime = -999;
 
     // Статистика партии (для заданий и «диагноза»)
-    this.stats = { pills: 0, specialPills: 0, nearMisses: 0, maxCombo: 0, dodges: 0, dashDodges: 0, hides: 0 };
+    this.stats = { pills: 0, specialPills: 0, nearMisses: 0, maxCombo: 0, dodges: 0, dashDodges: 0, hides: 0, cards: 0 };
 
     // Эффекты таблеток: сколько секунд ещё действуют
     this.effects = { validol: 0, sleeping: 0, mask: 0, laxative: 0 };
@@ -44,6 +44,20 @@ class GameScene extends Phaser.Scene {
     const ids = this.registry.get('missions') || Progress.rollMissions();
     this.registry.set('missions', ids);
     this.missions = ids.map((id) => Object.assign({ done: false }, CONFIG.MISSIONS.LIST.find((m) => m.id === id)));
+
+    // Режим: 'run' — «Смена» (этажи, сердечка, усиления, js/scenes/RunMode.js),
+    // 'duty' — «Дежурство» (выживание, одно касание — конец)
+    this.mode = this.registry.get('mode') || 'run';
+    this.isRun = this.mode === 'run';
+    // Сцена перезапускается тем же объектом — убираем ссылки на объекты прошлой смены
+    this.run = null;
+    this.cardItem = null;
+    this.targetDoor = null;
+    this.procedureDoor = null;
+    this.medkit = null;
+    if (this.isRun) {
+      this.initRun();
+    }
   }
 
   create() {
@@ -64,6 +78,10 @@ class GameScene extends Phaser.Scene {
     this.createIndicators();
     this.createEffectsHud();
     this.doorGraphics = this.add.graphics().setDepth(3); // мигание дверей и лампочки «занято»
+    if (this.isRun) {
+      this.createRun();
+    }
+    Hud.setRunVisible(this.isRun);
 
     // Уворот: кнопка справа внизу, на компьютере — пробел или Shift
     Hud.onDodge = () => this.tryDodge();
@@ -109,7 +127,7 @@ class GameScene extends Phaser.Scene {
     this.updateNpcs(dt);
     this.updatePuddles(dt);
 
-    const difficulty = this.getDifficulty(this.elapsed);
+    const difficulty = this.getDifficulty(this.elapsed + (this.isRun ? this.runDifficultyShift() : 0));
     const input = this.getMoveInput();
 
     this.updateEffects(dt);
@@ -125,7 +143,7 @@ class GameScene extends Phaser.Scene {
       }
       this.player.move(input.x, input.y, dt);
     }
-    Hud.setDodge(this.player.dodgeCooldown / CONFIG.DODGE.COOLDOWN);
+    Hud.setDodge(this.player.dodgeCooldown / this.player.dodgeCooldownMax);
 
     // Пока героиня в кабинете, пациенты топчутся у двери
     const target = this.hiding ? this.hiding.proxy : this.player;
@@ -155,6 +173,12 @@ class GameScene extends Phaser.Scene {
       ctx.dashBusy = ctx.dashBusy || chaser.isDashBusy();
     });
 
+    if (this.isRun) {
+      this.updateRun(dt);
+      if (this.isGameOver) {
+        return; // добежала до лестницы — этаж закончен
+      }
+    }
     this.updateBonusLifetime(dt, difficulty.phase);
     this.updateNearMisses(dt);
     this.updateMissions();
@@ -408,6 +432,9 @@ class GameScene extends Phaser.Scene {
       this.placeIndicator(chaser.arrow, chaser.x, chaser.y, color, true);
     });
     this.placeIndicator(this.bonusArrow, this.bonus.x, this.bonus.y, this.bonus.getColor(), this.bonus.active);
+    if (this.isRun) {
+      this.updateRunIndicators();
+    }
   }
 
   // Стрелка на краю экрана в направлении цели (только если цели не видно)
@@ -670,7 +697,7 @@ class GameScene extends Phaser.Scene {
         icon.setVisible(false);
         return;
       }
-      const y = 44 + row * 64;
+      const y = (this.isRun ? 150 : 44) + row * 64; // в смене выше — табличка с сердечками
       row += 1;
       drawPlate(g, 112, y, 200, 56, CONFIG.COLORS.PAPER, CONFIG.COLORS.PAPER_SHADE, 4);
       icon.setPosition(44, y - 2).setVisible(true);
@@ -821,6 +848,9 @@ class GameScene extends Phaser.Scene {
       g.fillStyle(busy ? CONFIG.COLORS.STAMP : 0x6fd36f, 1);
       g.fillRect(door.x - 5, 1, 10, 4);
     });
+    if (this.isRun) {
+      this.drawRunDoors(g);
+    }
   }
 
   // Укрытие: забежала в свободную дверь — 3 с в кабинете, пациенты ждут у двери
@@ -839,7 +869,11 @@ class GameScene extends Phaser.Scene {
     }
     const door = this.doors.find((d) => d.cooldown <= 0 &&
       Math.abs(this.player.x - d.x) < H.ENTER_DISTANCE && this.player.y < CONFIG.DOORS.BOTTOM + 30);
-    if (door) {
+    // В смене кабинет, куда несёшь медкарту, принимает карту (RunMode.updateRun), а не прячет
+    if (door && this.isRun && this.carrying && door === this.targetDoor) {
+      return;
+    }
+    if (door && !(this.isRun && this.tryProcedure(door))) {
       this.enterCabinet(door);
     }
   }
@@ -863,9 +897,14 @@ class GameScene extends Phaser.Scene {
 
   leaveCabinet() {
     const door = this.hiding.door;
+    const heal = this.hiding.heal;
     this.hiding = null;
     this.hideText.destroy();
-    door.cooldown = CONFIG.HIDE.COOLDOWN;
+    // «Блат» в смене: кабинет освобождается вдвое быстрее
+    door.cooldown = CONFIG.HIDE.COOLDOWN * (this.isRun && this.run.perks.blat ? 0.5 : 1);
+    if (heal) {
+      this.heal('укол сделан!');
+    }
     this.player.body.enable = true;
     this.player.body.reset(door.x, CONFIG.DOORS.FRONT_Y + 12);
     this.player.setVisible(true);
@@ -878,7 +917,8 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   missionValue(mission) {
-    return mission.stat === 'time' ? Math.floor(this.elapsed) : this.stats[mission.stat];
+    const time = this.isRun ? this.runTotalTime() : this.elapsed;
+    return mission.stat === 'time' ? Math.floor(time) : this.stats[mission.stat];
   }
 
   updateMissions() {
@@ -997,6 +1037,15 @@ class GameScene extends Phaser.Scene {
       Sound.vibrate(40);
       return;
     }
+    // В смене: пока есть сердечка — только минус сердечко
+    if (this.isRun && this.run.hearts > 1) {
+      this.loseHeart(chaser);
+      return;
+    }
+    if (this.isRun) {
+      this.run.hearts = 0;
+      this.updateRunHud();
+    }
     this.isGameOver = true;
     this.startHint.setVisible(false); // не просвечивает сквозь экран поражения
 
@@ -1015,20 +1064,25 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(CONFIG.CATCH_DELAY, this.finishGame, [], this);
   }
 
-  finishGame() {
+  // win — смена сдана (пройден последний этаж)
+  finishGame(win = false) {
     // Что было открыто до этой смены — чтобы показать новое (форма, штамп)
     const wasOpen = Progress.unlockedNames(Progress.load());
     const isNewRecord = saveBestScore(this.score);
     const missionsDone = this.missions.filter((m) => m.done).length;
     const result = {
+      mode: this.mode,
+      win: win,
+      floor: this.isRun ? this.run.floor : 0,
+      floors: CONFIG.RUN.FLOORS.length,
       score: this.score,
-      seconds: this.elapsed,
+      seconds: this.isRun ? this.runTotalTime() : this.elapsed,
       isNewRecord: isNewRecord,
       bestScore: getBestScore(),
       stats: this.stats,
       missions: this.missions,
       diagnosis: getDiagnosis(this.score),
-      stamp: Progress.randomStamp()
+      stamp: win ? 'СМЕНА СДАНА!' : Progress.randomStamp()
     };
     result.unlocked = Progress.recordGame(result, missionsDone, wasOpen);
     this.events.emit('game-over', result);
@@ -1043,7 +1097,7 @@ class GameScene extends Phaser.Scene {
     if (newScore !== this.score || seconds !== this.lastHudSecond) {
       this.score = newScore;
       this.lastHudSecond = seconds;
-      this.events.emit('hud-update', this.score, this.elapsed);
+      this.events.emit('hud-update', this.score, this.isRun ? this.runTotalTime() : this.elapsed);
     }
   }
 

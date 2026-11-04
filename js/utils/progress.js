@@ -8,7 +8,7 @@ const PROGRESS_KEY = 'neonEscape.progress';
 
 const Progress = {
   defaults() {
-    return { games: 0, totalPills: 0, totalMissions: 0, bestTime: 0, skin: 'classic' };
+    return { games: 0, totalPills: 0, totalMissions: 0, bestTime: 0, bestFloor: 0, skin: 'classic' };
   },
 
   load() {
@@ -58,6 +58,10 @@ const Progress = {
     data.totalPills += result.stats.pills;
     data.totalMissions += missionsDone;
     data.bestTime = Math.max(data.bestTime, Math.floor(result.seconds));
+    if (result.mode === 'run') {
+      // Этаж, до которого дошла (сдала смену — все этажи)
+      data.bestFloor = Math.max(data.bestFloor, result.win ? result.floors : result.floor);
+    }
     this.save(data);
     return this.unlockedNames(data).filter((name) => !wasOpen.includes(name));
   },

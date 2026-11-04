@@ -30,6 +30,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.dodgeDirection = new Phaser.Math.Vector2(0, 1);
     this.invulnerableTimer = 0; // неуязвимость после того, как маска спасла
     this.speedBoost = 1;        // валидол ускоряет
+    this.perkSpeed = 1;         // усиления «Смены»: кроссовки, курьер
+    this.dodgeCooldownMax = CONFIG.DODGE.COOLDOWN; // «Кофе» сокращает
+    this.dodgeDuration = CONFIG.DODGE.DURATION;    // «Длинный рывок» удлиняет
     this.wet = false;           // мокрый пол после санитарки: скользит и заносит
   }
 
@@ -43,7 +46,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
   // Уворот в сторону ввода (или туда, куда бежит / смотрит). false — ещё перезаряжается
   tryDodge(inputX, inputY) {
-    const D = CONFIG.DODGE;
     if (this.dodgeCooldown > 0 || this.dodgeTimer > 0) {
       return false;
     }
@@ -59,8 +61,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     }
     const length = Math.hypot(dx, dy);
     this.dodgeDirection.set(dx / length, dy / length);
-    this.dodgeTimer = D.DURATION;
-    this.dodgeCooldown = D.COOLDOWN;
+    this.dodgeTimer = this.dodgeDuration;
+    this.dodgeCooldown = this.dodgeCooldownMax;
     return true;
   }
 
@@ -90,7 +92,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     const inputLength = Math.hypot(inputX, inputY);
-    const targetSpeed = Math.min(1, inputLength) * P.SPEED * this.speedBoost;
+    const targetSpeed = Math.min(1, inputLength) * P.SPEED * this.speedBoost * this.perkSpeed;
     let speed = velocity.length();
 
     if (this.wet) {

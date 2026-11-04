@@ -81,6 +81,35 @@ const Hud = {
     this.dodgeButton.classList.toggle('is-ready', steps === 0);
   },
 
+  // «Смена»: показать/спрятать табличку с сердечками и целью
+  setRunVisible(visible) {
+    document.getElementById('hud-run').classList.toggle('is-off', !visible);
+  },
+
+  // Сердечка: полные и пустые (пиксельные картинки)
+  setHearts(hearts, max) {
+    const box = document.getElementById('hud-hearts');
+    const key = hearts + '/' + max;
+    if (box.dataset.key === key) {
+      return;
+    }
+    box.dataset.key = key;
+    box.innerHTML = '';
+    for (let i = 0; i < max; i++) {
+      const img = document.createElement('img');
+      img.src = i < hearts ? 'assets/ui/heart.png' : 'assets/ui/heart_empty.png';
+      img.alt = '';
+      box.appendChild(img);
+    }
+  },
+
+  setGoal(text) {
+    const goal = document.getElementById('hud-goal');
+    if (goal.textContent !== text) {
+      goal.textContent = text;
+    }
+  },
+
   // Комбо: множитель и доля оставшегося окна (1 → 0). multiplier < 2 — скрыть
   setCombo(multiplier, fraction) {
     const box = document.getElementById('hud-combo');

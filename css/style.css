@@ -108,6 +108,7 @@ body.is-game .hud {
 body.is-game.is-inactive #pause-button,
 body.is-game.is-inactive #dodge-button,
 body.is-game.is-inactive #hud-top,
+body.is-game.is-inactive #hud-run,
 body.is-game.is-inactive #joystick-base {
   visibility: hidden;
 }
@@ -172,6 +173,7 @@ body.is-game #joystick-base {
 
 /* Полупрозрачная табличка-побелка с пиксельными углами (как таблички на дверях) */
 #hud-top,
+#hud-run,
 #pause-button,
 #dodge-button {
   position: absolute;
@@ -182,6 +184,40 @@ body.is-game #joystick-base {
                      calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
   color: var(--ink);
   font-family: "Tiny5", monospace;
+}
+
+/* «Смена»: сердечка и цель этажа — слева вверху */
+#hud-run {
+  top: calc(var(--safe-t) + 6px);
+  left: calc(var(--safe-l) + 8px);
+  padding: 4px 8px 5px;
+  pointer-events: none;
+  max-width: 34vw;
+}
+
+body.is-game #hud-run.is-off {
+  visibility: hidden;
+}
+
+#hud-hearts {
+  display: flex;
+  gap: 3px;
+  height: 22px;
+}
+
+#hud-hearts img {
+  width: 24px;
+  height: 22px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#hud-goal {
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 1.1;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 /* Счёт и время — сверху по центру (слева вверху — значки действующих таблеток) */

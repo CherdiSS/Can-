@@ -10,7 +10,7 @@
 // Вертикальный центр и высота содержимого меню (в координатах вёрстки)
 const MENU_CENTER_Y = 360;
 const MENU_BLOCK_WIDTH = 1250;
-const MENU_BLOCK_HEIGHT = 700;
+const MENU_BLOCK_HEIGHT = 720;
 const MENU_LEFT_X = 330;   // центр левой колонки
 const MENU_RIGHT_X = 930;  // центр правой колонки
 const MENU_PIXEL_SCALE = 2; // пиксель-арт в меню — ровно ×2
@@ -39,20 +39,22 @@ class MenuScene extends Phaser.Scene {
     this.createIllustration(MENU_LEFT_X);
     this.createMemo(MENU_RIGHT_X);
 
-    // Главная кнопка — зелёная, как масляная панель стены
-    createButton(this, MENU_RIGHT_X, 480, 'ИГРАТЬ', () => this.startGame(), {
-      width: 460,
-      height: 130,
-      fontSize: 60,
+    // Главная кнопка — «Смена» (рогалик по этажам), зелёная, как масляная панель стены
+    createButton(this, MENU_RIGHT_X, 412, 'СМЕНА', () => this.startGame('run'), {
+      width: 490,
+      height: 116,
+      fontSize: 58,
       primary: true
     });
+    // «Дежурство» — прежний режим на выживание
+    createButton(this, MENU_RIGHT_X, 536, 'ДЕЖУРСТВО', () => this.startGame('duty'), { width: 490, height: 84, fontSize: 36 });
 
     // Гардероб и звук (настройка звука запоминается)
-    createButton(this, MENU_RIGHT_X - 125, 625, 'ГАРДЕРОБ', () => this.openWardrobe(), { width: 240, height: 96, fontSize: 32 });
-    this.soundButton = createButton(this, MENU_RIGHT_X + 125, 625, '', () => {
+    createButton(this, MENU_RIGHT_X - 125, 658, 'ГАРДЕРОБ', () => this.openWardrobe(), { width: 240, height: 84, fontSize: 30 });
+    this.soundButton = createButton(this, MENU_RIGHT_X + 125, 658, '', () => {
       Sound.setMuted(!Sound.muted);
       this.updateSoundLabel();
-    }, { width: 240, height: 96, fontSize: 30 });
+    }, { width: 240, height: 84, fontSize: 28 });
     this.updateSoundLabel();
 
     this.createHomeScreenHint(MENU_LEFT_X);
@@ -70,11 +72,12 @@ class MenuScene extends Phaser.Scene {
 
     // На компьютере можно начать игру клавишами Enter или Пробел
     if (this.input.keyboard) {
-      this.input.keyboard.on('keydown-ENTER', this.startGame, this);
-      this.input.keyboard.on('keydown-SPACE', this.startGame, this);
+      const startRun = () => this.startGame('run'); // клавиша передала бы событие вместо режима
+      this.input.keyboard.on('keydown-ENTER', startRun);
+      this.input.keyboard.on('keydown-SPACE', startRun);
       this.events.once('shutdown', () => {
-        this.input.keyboard.off('keydown-ENTER', this.startGame, this);
-        this.input.keyboard.off('keydown-SPACE', this.startGame, this);
+        this.input.keyboard.off('keydown-ENTER', startRun);
+        this.input.keyboard.off('keydown-SPACE', startRun);
       });
     }
   }
@@ -114,15 +117,17 @@ class MenuScene extends Phaser.Scene {
   createMemo(centerX) {
     const C = CONFIG.COLORS;
     const card = this.add.graphics();
-    drawForm(this, card, centerX, 215, 620, 340);
-    createText(this, centerX, 82, 'Левая половина экрана — бег,', 26);
-    createText(this, centerX, 116, 'кнопка справа внизу — уворот', 26);
-    createText(this, centerX, 166, 'Задания на смену:', 26, C.PAINT_LINE);
+    drawForm(this, card, centerX, 190, 620, 300);
+    createText(this, centerX, 68, 'Смена: 5 этажей, разнеси медкарты', 24);
+    createText(this, centerX, 96, 'Дежурство: продержись подольше', 24);
+    createText(this, centerX, 122, 'Слева — бег, справа внизу — уворот', 20, C.PAINT_LINE);
+    createText(this, centerX, 154, 'Задания:', 24, C.PAINT_LINE);
     this.registry.get('missions').forEach((id, i) => {
       const mission = CONFIG.MISSIONS.LIST.find((m) => m.id === id);
-      createText(this, centerX, 202 + i * 32, '- ' + mission.text + ' (+' + CONFIG.MISSIONS.POINTS + ')', 24, C.INK);
+      createText(this, centerX, 184 + i * 28, '- ' + mission.text + ' (+' + CONFIG.MISSIONS.POINTS + ')', 24, C.INK);
     });
-    createText(this, centerX, 335, 'Рекорд: ' + getBestScore(), 36, C.STAMP);
+    const bestFloor = Progress.load().bestFloor;
+    createText(this, centerX, 292, 'Рекорд: ' + getBestScore() + (bestFloor ? '  ·  этаж ' + bestFloor : ''), 32, C.STAMP);
   }
 
   updateSoundLabel() {
@@ -220,9 +225,15 @@ class MenuScene extends Phaser.Scene {
     }
   }
 
-  startGame() {
+  // mode: 'run' — «Смена» (по умолчанию, и для Enter/Пробела), 'duty' — «Дежурство»
+  startGame(mode = 'run') {
     if (this.wardrobe) {
       return; // в гардеробе Enter/Пробел не запускают игру
+    }
+    if (mode === 'run') {
+      Run.start(this.registry);
+    } else {
+      this.registry.set('mode', 'duty');
     }
     this.scene.start('GameScene');
   }

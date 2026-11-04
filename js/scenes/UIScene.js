@@ -40,6 +40,12 @@ class UIScene extends Phaser.Scene {
     this.gameScene.events.on('hud-update', this.updateHud, this);
     this.gameScene.events.on('player-caught', this.onPlayerCaught, this);
     this.gameScene.events.on('game-over', this.showGameOver, this);
+    this.gameScene.events.on('floor-cleared', this.showPerkChoice, this);
+
+    // «Смена»: в начале этажа — табличка с номером этажа и задачей
+    if (this.gameScene.isRun) {
+      this.showFloorBanner();
+    }
 
     // Автопауза при сворачивании вкладки или потере фокуса окна
     this.game.events.on(Phaser.Core.Events.BLUR, this.onFocusLost, this);
@@ -66,6 +72,10 @@ class UIScene extends Phaser.Scene {
     fitContainer(this.pauseContent, this.scale, PAUSE_BLOCK_HEIGHT, PAUSE_BLOCK_WIDTH);
     this.countdownContent.setPosition(width / 2, height / 2);
     fitContainer(this.gameOverContent, this.scale, GAME_OVER_BLOCK_HEIGHT, GAME_OVER_BLOCK_WIDTH);
+    if (this.perkContent && this.perkContent.active) {
+      this.perkShade.setPosition(width / 2, height / 2);
+      fitContainer(this.perkContent, this.scale, 640, 1120);
+    }
   }
 
   updateHud(score, seconds) {
@@ -270,6 +280,76 @@ class UIScene extends Phaser.Scene {
     ];
   }
 
+  // ---------------------------------------------------------------
+  // «Смена»: табличка этажа и ординаторская (выбор усиления)
+  // ---------------------------------------------------------------
+
+  showFloorBanner() {
+    const game = this.gameScene;
+    const C = CONFIG.COLORS;
+    const x = this.scale.width / 2;
+    const title = createText(this, x, 150, 'ЭТАЖ ' + game.run.floor + ' · ' + game.floorInfo.name.toUpperCase(), 44, C.PAPER)
+      .setBackgroundColor(colorToCss(C.INK)).setPadding(20, 8, 20, 12);
+    const sub = createText(this, x, 212, 'Разнеси медкарты по кабинетам: ' + game.floorInfo.cards, 26, C.PAPER, { stroke: 6 });
+    this.tweens.add({ targets: [title, sub], alpha: 0, delay: 2600, duration: 600, onComplete: () => { title.destroy(); sub.destroy(); } });
+  }
+
+  // Этаж пройден: три карточки-усиления, нажатие — взять и идти на следующий этаж
+  showPerkChoice(info) {
+    const C = CONFIG.COLORS;
+    const game = this.gameScene;
+    this.state = 'perks';
+    const shade = this.createShade(0.8);
+    shade.setPosition(this.scale.width / 2, this.scale.height / 2);
+    const card = this.createCard(1100, 620, '003/у');
+    const items = [card, card.formLabel,
+      createText(this, 0, -245, 'ОРДИНАТОРСКАЯ', 56),
+      createText(this, 0, -188, 'Этаж ' + info.floor + ' пройден. Возьми одно:', 28, C.PAINT_LINE),
+      createText(this, 0, 240, 'Сердечки: ' + game.run.hearts + ' из ' + game.run.maxHearts +
+        '   ·   дальше: этаж ' + (info.floor + 1) + ' — ' + CONFIG.RUN.FLOORS[info.floor].name, 24, C.PAINT_LINE)];
+    this.perkOptions = info.perks;
+    info.perks.forEach((perk, i) => {
+      const x = (i - 1) * 345;
+      const plate = this.add.graphics();
+      drawPlate(plate, x, 20, 320, 300, C.PAPER_SHADE, C.PAINT_LINE, 6);
+      const zone = this.add.rectangle(x, 20, 320, 300, 0x000000, 0.001).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => { plate.setAlpha(0.7); });
+      zone.on('pointerout', () => { plate.setAlpha(1); });
+      zone.on('pointerup', () => this.pickPerk(perk.key));
+      const have = Run.perkCount(game.run, perk.key);
+      items.push(plate, zone,
+        createText(this, x, -80, (i + 1) + '. ' + perk.name, 30, C.INK),
+        createText(this, x, 20, perk.text, 24, C.PAINT_LINE, { lineSpacing: 4 }),
+        createText(this, x, 125, have ? 'уже взято ×' + have : 'нажми, чтобы взять', 18, have ? C.STAMP : C.PAINT_DARK));
+    });
+    this.perkContent = this.add.container(0, 0, items);
+    this.perkShade = shade;
+    fitContainer(this.perkContent, this.scale, 640, 1120);
+    Sound.play('mission');
+    if (this.input.keyboard) {
+      this.input.keyboard.on('keydown', this.onPerkKey, this);
+    }
+  }
+
+  // На компьютере — клавиши 1, 2, 3
+  onPerkKey(event) {
+    const index = ['1', '2', '3'].indexOf(event.key);
+    if (this.state === 'perks' && index >= 0 && this.perkOptions[index]) {
+      this.pickPerk(this.perkOptions[index].key);
+    }
+  }
+
+  pickPerk(key) {
+    if (this.state !== 'perks') {
+      return;
+    }
+    this.state = 'next-floor';
+    Sound.play('click');
+    this.gameScene.applyPerkAndNextFloor(key);
+    // Новый этаж — новый запуск GameScene (она сама снова запустит интерфейс)
+    this.scene.start('GameScene');
+  }
+
   // Игрока поймали — паузу больше нажимать нельзя
   onPlayerCaught() {
     this.state = 'caught';
@@ -280,7 +360,9 @@ class UIScene extends Phaser.Scene {
     this.updateHud(result.score, result.seconds);
 
     this.finalScoreText.setText(String(result.score));
-    this.finalTimeText.setText('Время: ' + formatTime(result.seconds));
+    this.finalTimeText.setText(result.mode === 'run'
+      ? 'Этаж ' + result.floor + ' из ' + result.floors + ' · ' + formatTime(result.seconds)
+      : 'Время: ' + formatTime(result.seconds));
     this.bestScoreText.setText('Рекорд: ' + result.bestScore);
     this.diagnosisText.setText('Диагноз: ' + result.diagnosis);
     const done = result.missions.filter((m) => m.done).length;
@@ -306,6 +388,10 @@ class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   restartGame() {
+    // «Играть снова» в смене — новая смена с первого этажа
+    if (this.gameScene.isRun) {
+      Run.start(this.registry);
+    }
     // start() перезапускает GameScene и останавливает эту сцену;
     // GameScene сама снова запустит UIScene
     this.scene.start('GameScene');
@@ -322,6 +408,10 @@ class UIScene extends Phaser.Scene {
     this.gameScene.events.off('hud-update', this.updateHud, this);
     this.gameScene.events.off('player-caught', this.onPlayerCaught, this);
     this.gameScene.events.off('game-over', this.showGameOver, this);
+    this.gameScene.events.off('floor-cleared', this.showPerkChoice, this);
+    if (this.input.keyboard) {
+      this.input.keyboard.off('keydown', this.onPerkKey, this);
+    }
     this.game.events.off(Phaser.Core.Events.BLUR, this.onFocusLost, this);
     this.game.events.off(Phaser.Core.Events.HIDDEN, this.onFocusLost, this);
     if (this.input.keyboard) {

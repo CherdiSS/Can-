@@ -185,6 +185,13 @@ const Sound = {
       case 'mission':   // задание выполнено
         [0, 4, 7, 12, 16].forEach((n, i) => this.tone(659 * Math.pow(2, n / 12), 0.09, { volume: 0.12, delay: i * 0.07 }));
         break;
+      case 'hit':       // пациент задел: минус сердечко
+        this.noise(0.18, { from: 400, filter: 'lowpass', volume: 0.4 });
+        this.tone(220, 0.2, { to: 110, volume: 0.2 });
+        break;
+      case 'heal':      // +1 сердечко
+        [0, 7, 12].forEach((n, i) => this.tone(440 * Math.pow(2, n / 12), 0.12, { type: 'triangle', volume: 0.16, delay: i * 0.08 }));
+        break;
       case 'flicker':   // лампа дневного света трещит и мигает
         this.tone(100, 0.18, { type: 'square', volume: 0.025 * v });
         this.noise(0.06, { from: 5000, volume: 0.04 * v, q: 4 });

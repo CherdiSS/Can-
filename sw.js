@@ -9,7 +9,7 @@
 // Добавил новый файл (спрайт, скрипт)? Допиши его в FILES и увеличь VERSION.
 // =============================================================
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE_NAME = 'cgb-' + VERSION;
 const NETWORK_TIMEOUT = 3000; // мс
 
@@ -33,6 +33,7 @@ const FILES = [
   'js/scenes/BootScene.js',
   'js/scenes/MenuScene.js',
   'js/scenes/GameScene.js',
+  'js/scenes/RunMode.js',
   'js/scenes/UIScene.js',
   'js/main.js',
   'assets/fonts/tiny5-cyrillic-400-normal.woff2',
@@ -45,6 +46,11 @@ const FILES = [
   'assets/ui/joystick_base.png',
   'assets/ui/joystick_knob.png',
   'assets/ui/puddle.png',
+  'assets/ui/heart.png',
+  'assets/ui/heart_empty.png',
+  'assets/ui/medcard.png',
+  'assets/ui/medkit.png',
+  'assets/ui/stairs.png',
   'assets/ui/ring.png',
   'assets/sprites/bonus_pill.png',
   'assets/sprites/doctor_sheet.png',
