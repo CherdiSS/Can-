@@ -10,6 +10,7 @@
 #  - medcard.png        — медкарта (папка) на полу — её разносят по кабинетам
 #  - medkit.png         — аптечка (+1 сердечко)
 #  - stairs.png         — лестница на следующий этаж (вид сверху, 80×80)
+#  - tube.png           — пробирка с анализом (задача «Анализы»)
 import os
 from PIL import Image
 
@@ -210,6 +211,18 @@ def stairs():
     return s.im
 
 
+def tube():
+    """Пробирка с кровью в штативе-подставке, 20×36."""
+    GLASS_L, BLOOD = c(214, 226, 226), c(176, 36, 44)
+    s = Px(20, 36)
+    s.rect(5, 1, 14, 3, OUT); s.rect(6, 2, 13, 2, c(90, 120, 200))         # пробка
+    s.rect(5, 4, 14, 30, OUT); s.rect(6, 4, 13, 29, GLASS_L)
+    s.rect(6, 14, 13, 29, BLOOD); s.rect(6, 14, 13, 14, c(220, 80, 86)); s.rect(7, 5, 7, 27, c(250, 252, 252))
+    s.rect(2, 31, 17, 35, OUT); s.rect(3, 32, 16, 34, c(150, 154, 152))     # подставка
+    return s.im
+
+
+tube().save(os.path.join(HERE, 'tube.png'))
 heart(c(200, 40, 48), c(250, 160, 160)).save(os.path.join(HERE, 'heart.png'))
 heart(c(70, 70, 74), None).save(os.path.join(HERE, 'heart_empty.png'))
 medcard().save(os.path.join(HERE, 'medcard.png'))

@@ -435,6 +435,50 @@ def terminal(w=80, h=80, H=16):
     s.rect(30, h - H + 5, w - 31, h - H + 7, M_L)
     return pad(s, H)
 
+def barrier(w=120, h=40, H=14):
+    """Ремонт: красно-белое ограждение на козлах и мешок цемента."""
+    s = Img(w, h); RED, WHITE = c(170, 52, 48), c(206, 202, 186)
+    s.rect(0, 0, w - 1, h - H - 1, CONC_D)                            # пыль и бетон под ограждением
+    for x in range(2, w - 2):
+        s.rect(x, 6, x, 16, RED if (x // 10) % 2 == 0 else WHITE)      # полосатая перекладина
+    s.frame(1, 5, w - 2, 17, OUT)
+    s.rect(6, 19, 30, 24, SH_D); s.frame(6, 19, 30, 24, OUT)           # мешок цемента
+    s.rect(0, h - H, w - 1, h - 1, M_D); s.rect(4, h - H + 2, 8, h - 2, M); s.rect(w - 9, h - H + 2, w - 5, h - 2, M)
+    return finish(s, H)
+
+def barrier_v(w=40, h=120, H=16):
+    """То же ограждение, развёрнутое вдоль (вертикальное)."""
+    s = Img(w, h); RED, WHITE = c(170, 52, 48), c(206, 202, 186)
+    s.rect(0, 0, w - 1, h - H - 1, CONC_D)
+    for y in range(2, h - H - 2):
+        s.rect(12, y, 27, y, RED if (y // 10) % 2 == 0 else WHITE)
+    s.frame(11, 1, 28, h - H - 2, OUT)
+    s.rect(0, h - H, w - 1, h - 1, M_D); s.rect(6, h - H + 3, w - 7, h - 4, M)
+    return finish(s, H)
+
+def xray(w=160, h=80, H=16):
+    """Рентгеновский аппарат: стол, трубка на штативе, пульт."""
+    s = block(w, h, H, M_L, SH, M_D, OUT)
+    s.rect(6, 6, 104, h - H - 6, SH_D); s.rect(8, 8, 102, h - H - 8, SH)     # стол для снимков
+    s.rect(30, 14, 80, 18, M_D)
+    s.rect(112, 4, 154, h - H - 4, M); s.frame(112, 4, 154, h - H - 4, OUT)  # штатив с трубкой
+    s.ellipse(118, 10, 148, 40, OUT); s.ellipse(121, 13, 145, 37, M_D); s.ellipse(127, 19, 139, 31, c(200, 170, 60))
+    s.rect(116, 46, 150, 58, SEAT_D); s.rect(120, 49, 126, 52, c(200, 60, 50)); s.rect(130, 49, 136, 52, c(80, 160, 80))
+    s.rect(4, h - H + 3, w - 5, h - 5, M)
+    return finish(s, H)
+
+def desk(w=200, h=80, H=16):
+    """Стол главврача: зелёное сукно, бумаги, телефон, лампа, табличка."""
+    s = block(w, h, H, WD, WD_L, WD_D, OUT)
+    s.rect(8, 6, w - 9, h - H - 6, c(62, 88, 66)); s.frame(8, 6, w - 9, h - H - 6, WD_D)   # сукно
+    for k, x in enumerate((20, 44, 62)):                                   # стопки бумаг
+        s.rect(x, 12 + k * 3, x + 18, 30 + k * 3, SH); s.rect(x + 2, 16 + k * 3, x + 15, 16 + k * 3, SH_D)
+    s.rect(130, 12, 150, 26, OUT); s.rect(132, 14, 148, 20, c(120, 40, 40))  # телефон
+    s.ellipse(160, 10, 184, 34, M_D); s.ellipse(165, 15, 179, 29, c(210, 190, 110))   # лампа
+    s.rect(90, 38, 140, 46, c(180, 150, 70)); s.frame(90, 38, 140, 46, OUT)  # табличка
+    s.rect(6, h - H + 3, w - 7, h - 5, WD)
+    return finish(s, H)
+
 LOOKS = {
     'chairs4':      (lambda: chairs(190, 4),  (190, 40)),
     'bench':        (lambda: bench(190),      (190, 40)),
@@ -452,6 +496,10 @@ LOOKS = {
     'bahily':       (bahily,                  (80, 80)),
     'scales':       (scales,                  (80, 80)),
     'terminal':     (terminal,                (80, 80)),
+    'barrier':      (barrier,                 (120, 40)),
+    'barrier_v':    (barrier_v,               (40, 120)),
+    'xray':         (xray,                    (160, 80)),
+    'desk':         (desk,                    (200, 80)),
 }
 
 if __name__ == "__main__":

@@ -290,8 +290,15 @@ class UIScene extends Phaser.Scene {
     const x = this.scale.width / 2;
     const title = createText(this, x, 150, 'ЭТАЖ ' + game.run.floor + ' · ' + game.floorInfo.name.toUpperCase(), 44, C.PAPER)
       .setBackgroundColor(colorToCss(C.INK)).setPadding(20, 8, 20, 12);
-    const sub = createText(this, x, 212, 'Разнеси медкарты по кабинетам: ' + game.floorInfo.cards, 26, C.PAPER, { stroke: 6 });
-    this.tweens.add({ targets: [title, sub], alpha: 0, delay: 2600, duration: 600, onComplete: () => { title.destroy(); sub.destroy(); } });
+    const task = CONFIG.RUN.TASKS[game.task];
+    const count = game.task === 'round' ? '' : ': ' + game.floorInfo.count;
+    const sub = createText(this, x, 212, task.text + count, 26, C.PAPER, { stroke: 6 });
+    const items = [title, sub];
+    if (game.modifier) {
+      const mod = CONFIG.RUN.MODIFIERS[game.modifier];
+      items.push(createText(this, x, 256, '★ ' + mod.name + ': ' + mod.text, 26, C.BONUS, { stroke: 6 }));
+    }
+    this.tweens.add({ targets: items, alpha: 0, delay: 3000, duration: 600, onComplete: () => items.forEach((i) => i.destroy()) });
   }
 
   // Этаж пройден: три карточки-усиления, нажатие — взять и идти на следующий этаж
@@ -304,22 +311,25 @@ class UIScene extends Phaser.Scene {
     const card = this.createCard(1100, 620, '003/у');
     const items = [card, card.formLabel,
       createText(this, 0, -245, 'ОРДИНАТОРСКАЯ', 56),
-      createText(this, 0, -188, 'Этаж ' + info.floor + ' пройден. Возьми одно:', 28, C.PAINT_LINE),
+      createText(this, 0, -188, 'Этаж ' + info.floor + ' пройден' + (info.risky ? ' (рискованный — 4 на выбор)' : '') + '. Возьми одно:', 26, C.PAINT_LINE),
       createText(this, 0, 240, 'Сердечки: ' + game.run.hearts + ' из ' + game.run.maxHearts +
-        '   ·   дальше: этаж ' + (info.floor + 1) + ' — ' + CONFIG.RUN.FLOORS[info.floor].name, 24, C.PAINT_LINE)];
+        '   ·   дальше: этаж ' + (info.floor + 1) + ' — ' + CONFIG.RUN.FLOORS[info.floor].name +
+        (info.nextModifier ? ', ★ ' + CONFIG.RUN.MODIFIERS[info.nextModifier].name : ''), 22, C.PAINT_LINE)];
     this.perkOptions = info.perks;
+    const n = info.perks.length;
+    const plateW = n > 3 ? 240 : 320;
     info.perks.forEach((perk, i) => {
-      const x = (i - 1) * 345;
+      const x = (i - (n - 1) / 2) * (plateW + 22);
       const plate = this.add.graphics();
-      drawPlate(plate, x, 20, 320, 300, C.PAPER_SHADE, C.PAINT_LINE, 6);
-      const zone = this.add.rectangle(x, 20, 320, 300, 0x000000, 0.001).setInteractive({ useHandCursor: true });
+      drawPlate(plate, x, 20, plateW, 300, C.PAPER_SHADE, C.PAINT_LINE, 6);
+      const zone = this.add.rectangle(x, 20, plateW, 300, 0x000000, 0.001).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => { plate.setAlpha(0.7); });
       zone.on('pointerout', () => { plate.setAlpha(1); });
       zone.on('pointerup', () => this.pickPerk(perk.key));
       const have = Run.perkCount(game.run, perk.key);
       items.push(plate, zone,
-        createText(this, x, -80, (i + 1) + '. ' + perk.name, 30, C.INK),
-        createText(this, x, 20, perk.text, 24, C.PAINT_LINE, { lineSpacing: 4 }),
+        createText(this, x, -80, (i + 1) + '. ' + perk.name, n > 3 ? 21 : 30, C.INK),
+        createText(this, x, 20, perk.text, n > 3 ? 20 : 24, C.PAINT_LINE, { lineSpacing: 4 }),
         createText(this, x, 125, have ? 'уже взято ×' + have : 'нажми, чтобы взять', 18, have ? C.STAMP : C.PAINT_DARK));
     });
     this.perkContent = this.add.container(0, 0, items);
@@ -333,7 +343,7 @@ class UIScene extends Phaser.Scene {
 
   // На компьютере — клавиши 1, 2, 3
   onPerkKey(event) {
-    const index = ['1', '2', '3'].indexOf(event.key);
+    const index = ['1', '2', '3', '4'].indexOf(event.key);
     if (this.state === 'perks' && index >= 0 && this.perkOptions[index]) {
       this.pickPerk(this.perkOptions[index].key);
     }

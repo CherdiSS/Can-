@@ -9,7 +9,7 @@
 // Добавил новый файл (спрайт, скрипт)? Допиши его в FILES и увеличь VERSION.
 // =============================================================
 
-const VERSION = 'v4';
+const VERSION = 'v5';
 const CACHE_NAME = 'cgb-' + VERSION;
 const NETWORK_TIMEOUT = 3000; // мс
 
@@ -19,6 +19,7 @@ const FILES = [
   'manifest.webmanifest',
   'css/style.css',
   'js/lib/phaser.min.js',
+  'js/layouts.js',
   'js/config.js',
   'js/utils/storage.js',
   'js/utils/progress.js',
@@ -51,6 +52,7 @@ const FILES = [
   'assets/ui/medcard.png',
   'assets/ui/medkit.png',
   'assets/ui/stairs.png',
+  'assets/ui/tube.png',
   'assets/ui/ring.png',
   'assets/sprites/bonus_pill.png',
   'assets/sprites/doctor_sheet.png',
@@ -75,6 +77,10 @@ const FILES = [
   'assets/environment/decal_wear.png',
   'assets/environment/floor_tile.png',
   'assets/environment/obstacle_bahily.png',
+  'assets/environment/obstacle_barrier.png',
+  'assets/environment/obstacle_barrier_v.png',
+  'assets/environment/obstacle_xray.png',
+  'assets/environment/obstacle_desk.png',
   'assets/environment/obstacle_bench.png',
   'assets/environment/obstacle_chairs3.png',
   'assets/environment/obstacle_chairs4.png',

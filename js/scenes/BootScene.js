@@ -40,6 +40,7 @@ class BootScene extends Phaser.Scene {
     this.load.image('ui-medcard', 'assets/ui/medcard.png');
     this.load.image('ui-medkit', 'assets/ui/medkit.png');
     this.load.image('ui-stairs', 'assets/ui/stairs.png');
+    this.load.image('ui-tube', 'assets/ui/tube.png');
   }
 
   create() {
@@ -52,7 +53,7 @@ class BootScene extends Phaser.Scene {
         .map((key) => 'env-' + key))
       .concat(CONFIG.ENVIRONMENT.LOOKS.map((look) => 'obstacle-' + look))
       .concat(Object.values(CONFIG.NPC).map((npc) => npc.texture))
-      .concat(['ui-ring', 'ui-arrow', 'ui-arrow-diag', 'ui-puddle', 'ui-medcard', 'ui-medkit', 'ui-stairs']);
+      .concat(['ui-ring', 'ui-arrow', 'ui-arrow-diag', 'ui-puddle', 'ui-medcard', 'ui-medkit', 'ui-stairs', 'ui-tube']);
     keys.forEach((key) => {
       this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });

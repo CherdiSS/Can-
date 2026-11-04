@@ -16,30 +16,33 @@ const BAYER_4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) =
 
 class Lighting {
   // scene — сцена; width/height — размер освещаемой области в координатах мира;
-  // lamps — [[x, y], ...]; options.flickering — индексы мигающих ламп
+  // lamps — [[x, y], ...]; options.flickering — индексы мигающих ламп;
+  // options.dark — темнота вдали от ламп (по умолчанию CONFIG.LIGHTING.DARK)
   constructor(scene, width, height, lamps, options = {}) {
     const L = CONFIG.LIGHTING;
     this.scene = scene;
     this.lamps = lamps;
     this.cell = L.CELL;
+    this.dark = options.dark || L.DARK;
 
     // 1) Темнота от всех ламп сразу — одна картинка на всё поле
-    const key = options.key || ('light-' + width + 'x' + height);
+    const key = 'light-' + width + 'x' + height + '-' + this.dark + '-' + lamps.map((l) => l.join(':')).join(',');
     if (!scene.textures.exists(key)) {
       this.drawDarkness(key, width, height, lamps);
     }
     this.darkness = scene.add.image(0, 0, key).setOrigin(0).setScale(this.cell).setDepth(L.DEPTH);
 
     // 2) Мигающие лампы: когда лампа гаснет, поверх кладётся «пятно темноты» её размера
-    if (!scene.textures.exists('light-patch')) {
-      this.drawPatch('light-patch');
+    this.patchKey = 'light-patch-' + this.dark;
+    if (!scene.textures.exists(this.patchKey)) {
+      this.drawPatch(this.patchKey);
     }
     this.flickers = (options.flickering || []).map((index) => {
       const [x, y] = lamps[index];
       // левый верхний угол пятна — по сетке «пикселей» света, чтобы клетки совпадали
       const half = Math.ceil(L.RADIUS * 2 / this.cell) * this.cell / 2;
       const patch = scene.add.image(Math.round((x - half) / this.cell) * this.cell, Math.round((y - half) / this.cell) * this.cell,
-        'light-patch').setOrigin(0).setScale(this.cell).setDepth(L.DEPTH + 0.1).setVisible(false);
+        this.patchKey).setOrigin(0).setScale(this.cell).setDepth(L.DEPTH + 0.1).setVisible(false);
       return { x, y, patch, timer: Phaser.Math.FloatBetween(1, L.FLICKER_EVERY[1]), burst: 0, off: false };
     });
   }
@@ -75,7 +78,7 @@ class Lighting {
     for (let cy = 0; cy < rows; cy++) {
       for (let cx = 0; cx < cols; cx++) {
         const light = this.lightAt((cx + 0.5) * this.cell, (cy + 0.5) * this.cell, lamps);
-        const dark = this.quantize(L.DARK - (L.DARK - L.LIT) * light, cx, cy);
+        const dark = this.quantize(this.dark - (this.dark - L.LIT) * light, cx, cy);
         const i = (cy * cols + cx) * 4;
         image.data[i] = 8;      // темнота чуть зеленоватая, как в старом здании
         image.data[i + 1] = 14;
@@ -100,7 +103,7 @@ class Lighting {
       for (let cx = 0; cx < size; cx++) {
         const d = Math.hypot(cx + 0.5 - c, cy + 0.5 - c) / c;
         const k = d < 1 ? (1 - d * d) * (1 - d * d) : 0;
-        const dark = this.quantize((L.DARK - L.LIT) * k * L.FLICKER_DEPTH, cx, cy);
+        const dark = this.quantize((this.dark - L.LIT) * k * L.FLICKER_DEPTH, cx, cy);
         const i = (cy * size + cx) * 4;
         image.data[i] = 8;
         image.data[i + 1] = 14;
@@ -142,6 +145,41 @@ class Lighting {
       f.patch.setVisible(f.off);
     });
   }
+}
+
+// «Отключили свет»: дополнительная темнота всюду, кроме круга вокруг героини.
+// Картинка размером с два экрана (чтобы закрывать экран при любом положении камеры)
+// ездит за героиней; клетки — те же 8×8, что у основного света.
+function createFlashlight(scene, radius, darkness, depth) {
+  const L = CONFIG.LIGHTING;
+  const cell = L.CELL;
+  const cols = Math.ceil(CONFIG.MAX_WIDTH * 2 / cell);
+  const rows = Math.ceil(CONFIG.HEIGHT * 2 / cell);
+  const key = 'flashlight-' + radius + '-' + darkness;
+  if (!scene.textures.exists(key)) {
+    const texture = scene.textures.createCanvas(key, cols, rows);
+    const ctx = texture.getContext();
+    const image = ctx.createImageData(cols, rows);
+    for (let cy = 0; cy < rows; cy++) {
+      for (let cx = 0; cx < cols; cx++) {
+        const d = Math.hypot((cx + 0.5 - cols / 2) * cell, (cy + 0.5 - rows / 2) * cell) / radius;
+        const k = Math.min(1, Math.max(0, (d - 0.55) / 0.45));
+        const level = Math.min(L.LEVELS, Math.floor(k * darkness * L.LEVELS + BAYER_4[(cy % 4) * 4 + (cx % 4)])) / L.LEVELS;
+        const i = (cy * cols + cx) * 4;
+        image.data[i] = 4;
+        image.data[i + 1] = 8;
+        image.data[i + 2] = 8;
+        image.data[i + 3] = Math.round(level * 255);
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+    texture.refresh();
+    texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  }
+  const light = scene.add.image(0, 0, key).setScale(cell).setDepth(depth);
+  // Следовать за героиней по сетке клеток — пиксели света не «плывут»
+  light.follow = (x, y) => light.setPosition(Math.round(x / cell) * cell, Math.round(y / cell) * cell);
+  return light;
 }
 
 // Виньетка: тёмные края экрана (рисуется в координатах экрана, поверх всего поля)

@@ -51,6 +51,10 @@ class GameScene extends Phaser.Scene {
     this.isRun = this.mode === 'run';
     // Сцена перезапускается тем же объектом — убираем ссылки на объекты прошлой смены
     this.run = null;
+    this.pointsMul = 1;
+    this.stairs = [];
+    this.tubes = [];
+    this.flashlight = null;
     this.cardItem = null;
     this.targetDoor = null;
     this.procedureDoor = null;
@@ -58,6 +62,36 @@ class GameScene extends Phaser.Scene {
     if (this.isRun) {
       this.initRun();
     }
+    this.level = this.buildLevel();
+  }
+
+  // Этаж: раскладка мебели (js/layouts.js), может быть отражена слева направо;
+  // вместе с мебелью отражаются места медкарт, лестниц, пробирок и маршруты персонажей.
+  // «Ремонт» добавляет ограждения. В «Дежурстве» — всегда «Регистратура» без отражения
+  buildLevel() {
+    const run = this.run;
+    const key = run ? run.layout : 'registratura';
+    const mirror = run ? run.mirror : false;
+    const S = LAYOUTS.shared;
+    const layout = LAYOUTS.list[key];
+    const mx = (x) => (mirror ? CONFIG.ARENA.WIDTH - x : x);
+    const mp = ([x, y]) => [mx(x), y];
+    const obstacles = layout.obstacles.concat(run && run.modifier === 'repair' ? layout.repair : [])
+      .map((o) => Object.assign({}, o, { x: mx(o.x) }));
+    return {
+      key: key,
+      mirror: mirror,
+      obstacles: obstacles,
+      start: mp(S.start),
+      cardSpots: S.cardSpots.map(mp),
+      stairsSpots: S.stairsSpots.map(mp),
+      testSpots: S.testSpots.map(mp),
+      fallback: S.fallback.map(([x, y]) => ({ x: mx(x), y: y })),
+      npc: {
+        cleaner: { path: S.cleanerPath.map(mp) },
+        granny: { approach: S.grannyApproach.map(mp), path: S.grannyPath.map(mp) }
+      }
+    };
   }
 
   create() {
@@ -122,6 +156,9 @@ class GameScene extends Phaser.Scene {
     }
 
     this.lighting.update(dt, (x, y) => this.onLampFlicker(x, y));
+    if (this.flashlight) {
+      this.flashlight.follow(this.player.x, this.player.y);
+    }
     this.updateSpawns();
     this.updateDoors(dt);
     this.updateNpcs(dt);
@@ -225,7 +262,13 @@ class GameScene extends Phaser.Scene {
   // Лампы дневного света: светлые пятна, полумрак между ними, мигание, виньетка по краям экрана
   createLighting() {
     const L = CONFIG.LIGHTING;
-    this.lighting = new Lighting(this, CONFIG.ARENA.WIDTH, CONFIG.ARENA.HEIGHT, L.LAMPS, { flickering: L.FLICKERING });
+    const floor = this.isRun ? this.floorInfo : null;
+    const dark = this.isRun && this.run.modifier === 'dark';
+    // «Отключили свет»: горит каждая третья лампа, и вокруг героини — круг света
+    const lamps = dark ? L.LAMPS.filter((lamp, i) => i % 3 === 0) : L.LAMPS;
+    this.lighting = new Lighting(this, CONFIG.ARENA.WIDTH, CONFIG.ARENA.HEIGHT, lamps,
+      { flickering: dark ? [] : L.FLICKERING, dark: floor && floor.dark });
+    this.flashlight = dark ? createFlashlight(this, CONFIG.RUN.FLASHLIGHT.RADIUS, CONFIG.RUN.FLASHLIGHT.DARK, L.DEPTH + 0.2) : null;
     this.vignette = createVignette(this, 49);
   }
 
@@ -260,7 +303,7 @@ class GameScene extends Phaser.Scene {
     const shadows = this.add.graphics().setDepth(1);
     shadows.fillStyle(0x000000, shadow.ALPHA);
 
-    CONFIG.OBSTACLES.forEach((item) => {
+    this.level.obstacles.forEach((item) => {
       // Коллизия — прежний невидимый прямоугольник того же размера
       const rect = this.add.rectangle(item.x, item.y, item.w, item.h).setVisible(false);
       this.obstacles.add(rect);
@@ -296,7 +339,7 @@ class GameScene extends Phaser.Scene {
   }
 
   createPlayer() {
-    this.player = new Player(this, CONFIG.PLAYER.START.x, CONFIG.PLAYER.START.y);
+    this.player = new Player(this, this.level.start[0], this.level.start[1]);
     // Шаги героини: звук, когда нога касается пола (кадры «полёта» 3 и 5 листа)
     this.player.on('animationupdate', (anim, frame) => {
       if (anim.key.endsWith('run') && (frame.index === 2 || frame.index === 4)) {
@@ -589,9 +632,9 @@ class GameScene extends Phaser.Scene {
     }
 
     // Запасной вариант: самая дальняя от игрока заранее проверенная точка
-    let best = B.FALLBACK_POINTS[0];
+    let best = this.level.fallback[0];
     let bestDistance = -1;
-    B.FALLBACK_POINTS.forEach((point) => {
+    this.level.fallback.forEach((point) => {
       const distance = Phaser.Math.Distance.Between(point.x, point.y, this.player.x, this.player.y);
       if (distance > bestDistance) {
         bestDistance = distance;
@@ -764,12 +807,13 @@ class GameScene extends Phaser.Scene {
       const role = CONFIG.CHASER.ROLES.find((r) => r.key === entry.role);
       this.addChaser(role, x, y);
     } else {
-      this.addNpc(entry.npc, x, y);
+      this.addNpc(entry.npc, x, y, entry.route || this.level.npc[entry.npc]);
     }
   }
 
-  addNpc(key, x, y) {
-    const npc = new Npc(this, key, x, y);
+  // route — маршрут и особенности (из раскладки этажа; «Час пик» — бабушки бродят по кругу)
+  addNpc(key, x, y, route = this.level.npc[key]) {
+    const npc = new Npc(this, key, x, y, route);
     this.npcs.push(npc);
     npc.puddleTimer = 0;
     if (npc.cfg.hitboxRadius) {
@@ -949,6 +993,12 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   addPoints(points, x, y, label, color) {
+    // «Комиссия» в смене: очки ×2
+    const mul = this.pointsMul || 1;
+    if (mul > 1) {
+      points *= mul;
+      label += ' ×' + mul;
+    }
     this.extraPoints += points;
     this.popup(x, y, label, color);
   }

@@ -3,12 +3,14 @@
 //   санитарка — ходит по коридорам и оставляет мокрые лужи (скользко);
 //   бабушка — медленно топчется в очереди и загораживает проход (твёрдая).
 // Выходят из двери кабинета, идут к своему маршруту и ходят по нему по кругу.
-// Маршруты в CONFIG.NPC проверены: на отрезках нет препятствий.
+// Маршруты общие для всех раскладок (js/layouts.js → shared), генератор раскладок
+// держит их свободными от мебели; при отражении этажа отражаются и маршруты.
 // =============================================================
 
 class Npc extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, key, x, y) {
-    const cfg = CONFIG.NPC[key];
+  // route — маршрут этажа (path, approach) и особенности (puddleEvery) поверх CONFIG.NPC
+  constructor(scene, key, x, y, route = {}) {
+    const cfg = Object.assign({}, CONFIG.NPC[key], route);
     super(scene, x, y, cfg.texture);
     scene.add.existing(this);
     scene.physics.add.existing(this);
